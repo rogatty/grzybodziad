@@ -28,7 +28,7 @@ export class GameScene extends Phaser.Scene {
     private score = 0;
     private coins = 0;
     private timeLeft = ROUND_DURATION;
-    private basket: Array<{ points: number; spoilAt: number; resourceType: ResourceType | 'trash' }> = [];
+    private basket: Array<{ points: number; spoilAt: number; resourceType: ResourceType | 'trash'; textureKey?: string }> = [];
     private basketCapacity = BASKET_BASE_CAPACITY;
     private trashBag = 0;
     private trashBagCapacity = 0;
@@ -212,7 +212,7 @@ export class GameScene extends Phaser.Scene {
 
 
         // Listen for shop/costume-shop/skup closing
-        type BasketItem = { points: number; spoilAt: number; resourceType: ResourceType | 'trash' };
+        type BasketItem = { points: number; spoilAt: number; resourceType: ResourceType | 'trash'; textureKey?: string };
         this.events.on('resume', (sys: Phaser.Scenes.Systems, data: {
             coins?: number; costume?: string;
             basket?: BasketItem[]; score?: number; fromSkup?: boolean;
@@ -390,7 +390,12 @@ export class GameScene extends Phaser.Scene {
             attempts++;
         } while (
             attempts < 20 &&
-            this.stoneList.some(s => Phaser.Math.Distance.Between(x, y, s.x, s.y) < s.radius + 30)
+            (
+                this.stoneList.some(s => Phaser.Math.Distance.Between(x, y, s.x, s.y) < s.radius + 30) ||
+                this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 70) ||
+                this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < 60) ||
+                [this.hut, this.costumeHut, this.skupHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 110)
+            )
         );
         if (attempts >= 20) return;
 
@@ -459,7 +464,12 @@ export class GameScene extends Phaser.Scene {
             attempts++;
         } while (
             attempts < 20 &&
-            this.stoneList.some(s => Phaser.Math.Distance.Between(x, y, s.x, s.y) < s.radius + 30)
+            (
+                this.stoneList.some(s => Phaser.Math.Distance.Between(x, y, s.x, s.y) < s.radius + 30) ||
+                this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 60) ||
+                this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < 70) ||
+                [this.hut, this.costumeHut, this.skupHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 110)
+            )
         );
         if (attempts >= 20) return;
 
@@ -722,7 +732,7 @@ export class GameScene extends Phaser.Scene {
                 return;
             }
             if (dist <= r && !basketFull) {
-                this.basket.push({ points: resource.points, spoilAt: now + BASKET_SPOIL_TIME, resourceType: resource.resourceType });
+                this.basket.push({ points: resource.points, spoilAt: now + BASKET_SPOIL_TIME, resourceType: resource.resourceType, textureKey: resource.texture.key });
                 this.updateBasketUI();
                 this.showCollectText(`+${resource.points} ${RESOURCE_NAMES_PL[resource.resourceType]}`);
                 resource.collect();
@@ -744,7 +754,7 @@ export class GameScene extends Phaser.Scene {
                     this.updateTrashBagUI();
                     this.showCollectText('🗑 Śmieć w worku!');
                 } else if (this.basket.length < this.basketCapacity) {
-                    this.basket.push({ points: 0, spoilAt: Infinity, resourceType: 'trash' });
+                    this.basket.push({ points: 0, spoilAt: Infinity, resourceType: 'trash', textureKey: trash.texture.key });
                     this.updateBasketUI();
                     this.showCollectText('🗑 Śmieć w koszyku!');
                 } else {

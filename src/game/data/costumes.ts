@@ -1,18 +1,17 @@
 export interface Costume {
     id: string;
     namePL: string;
-    color: number;   // tymczasowy kolor — zastąpiony sprite'em gdy będzie gotowy
-    cost: number;    // 0 = darmowe (domyślne)
+    sprite?: string;  // klucz tekstury — jeśli brak, używamy 'player' + kolorowa elipsa
+    color: number;    // kolor elipsy (dla przebrań bez sprite'a) lub kolor tła podglądu
+    cost: number;     // 0 = darmowe (domyślne)
 }
 
 export const COSTUMES: Costume[] = [
-    { id: 'zielony',       namePL: 'Zielony',       color: 0x6bcb77, cost: 0  },
-    { id: 'niebieski',     namePL: 'Niebieski',     color: 0x4d9de0, cost: 10 },
-    { id: 'czerwony',      namePL: 'Czerwony',      color: 0xe15554, cost: 15 },
-    { id: 'żółty',         namePL: 'Żółty',         color: 0xf4d35e, cost: 10 },
-    { id: 'fioletowy',     namePL: 'Fioletowy',     color: 0x9b5de5, cost: 20 },
-    { id: 'różowy',        namePL: 'Różowy',        color: 0xf15bb5, cost: 15 },
-    { id: 'pomarańczowy',  namePL: 'Pomarańczowy',  color: 0xff6b35, cost: 15 },
+    { id: 'domyslne',      namePL: 'Domyślne',      color: 0x6bcb77, cost: 0  },
+    { id: 'niebieskie',    namePL: 'Niebieskie',    sprite: 'costume1', color: 0x4d9de0, cost: 10 },
+    { id: 'kapelusznik',   namePL: 'Kapelusznik',   sprite: 'costume2', color: 0x9b5de5, cost: 15 },
+    { id: 'szaraczek',     namePL: 'Szaraczek',     sprite: 'costume3', color: 0x888888, cost: 10 },
+    { id: 'pomaranczowe',  namePL: 'Pomarańczowe',  sprite: 'costume4', color: 0xff6b35, cost: 10 },
 ];
 
-export const DEFAULT_COSTUME_ID = 'zielony';
+export const DEFAULT_COSTUME_ID = 'domyslne';

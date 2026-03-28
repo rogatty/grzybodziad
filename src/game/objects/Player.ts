@@ -21,17 +21,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     readonly bodyFill: Phaser.GameObjects.Ellipse;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
-        super(scene, x, y, 'player');
+        const costumeKey: string = scene.registry.get('activeCostume') ?? DEFAULT_COSTUME_ID;
+        const costumeData = COSTUMES.find(c => c.id === costumeKey) ?? COSTUMES[0];
+        super(scene, x, y, costumeData.sprite ?? 'player');
         scene.add.existing(this);
         scene.physics.add.existing(this);
 
         this.setCollideWorldBounds(true);
         this.setDepth(10);
+        if (costumeData.sprite) this.setDisplaySize(56, 80);
 
-        // Colored fill sits just behind the outline
-        const costumeKey: string = scene.registry.get('activeCostume') ?? DEFAULT_COSTUME_ID;
-        const color = COSTUMES.find(c => c.id === costumeKey)?.color ?? COSTUMES[0].color;
-        this.bodyFill = scene.add.ellipse(x, y, 56, 80, color).setDepth(9);
+        // Colored fill sits just behind the outline (only for default costume without sprite)
+        this.bodyFill = scene.add.ellipse(x, y, 56, 80, costumeData.color).setDepth(9);
+        this.bodyFill.setVisible(false);
 
         if (scene.input.keyboard) {
             this.cursors = scene.input.keyboard.createCursorKeys();
@@ -60,8 +62,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     setCostume(costumeKey: string): void {
-        const color = COSTUMES.find(c => c.id === costumeKey)?.color ?? COSTUMES[0].color;
-        this.bodyFill.setFillStyle(color);
+        const costumeData = COSTUMES.find(c => c.id === costumeKey) ?? COSTUMES[0];
+        this.setTexture(costumeData.sprite ?? 'player');
+        if (costumeData.sprite) {
+            this.setDisplaySize(56, 80);
+            this.bodyFill.setVisible(false);
+        } else {
+            this.setScale(1);
+            this.bodyFill.setVisible(false);
+        }
         this.scene.registry.set('activeCostume', costumeKey);
     }
 

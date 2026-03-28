@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { ResourceType, RESOURCE_NAMES_PL } from '../data/constants';
+import { ResourceType } from '../data/constants';
 
-type BasketItem = { points: number; spoilAt: number; resourceType: ResourceType | 'trash' };
+type BasketItem = { points: number; spoilAt: number; resourceType: ResourceType | 'trash'; textureKey?: string };
 
 interface SkupData {
     basket: BasketItem[];
@@ -12,12 +12,6 @@ interface SkupData {
 const SELL_SPEED_COSTS = [15, 25, 40]; // cost to reach level 1, 2, 3
 const SELL_SPEED_ITEMS = [1, 2, 3, 5]; // items sold per click at level 0, 1, 2, 3
 
-const RESOURCE_COLORS: Record<ResourceType | 'trash', number> = {
-    mushroom: 0xdd4444,
-    berry:    0x3355cc,
-    flower:   0xffdd00,
-    trash:    0x998866,
-};
 
 export class Skup extends Phaser.Scene {
     private basket: BasketItem[] = [];       // only sellable (non-trash)
@@ -45,29 +39,38 @@ export class Skup extends Phaser.Scene {
 
     create(): void {
         const { width, height } = this.scale;
+        const cx = Math.round(width / 2) - 80; // dialog center, shifted left to make room for grzybodziad
 
         this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
-        this.add.rectangle(width / 2, height / 2, 560, 540, 0x2a1a0e, 0.95)
+
+        // Grzybodziad po prawej stronie — tło pod rysunkiem
+        this.add.rectangle(width - 98, height / 2 + 10, 210, 320, 0xfff5e0, 1)
+            .setStrokeStyle(3, 0xffcc44);
+        this.add.image(width - 98, height / 2 + 10, 'grzybodziad')
+            .setOrigin(0.5)
+            .setDisplaySize(197, 300);
+
+        this.add.rectangle(cx, height / 2, 560, 540, 0x2a1a0e, 0.95)
             .setStrokeStyle(3, 0xffcc44);
 
-        this.add.text(width / 2, height / 2 - 245, '🏪  Skup zasobów', {
+        this.add.text(cx, height / 2 - 245, '🏪  Skup zasobów', {
             fontSize: '32px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.coinsText = this.add.text(width / 2, height / 2 - 207, `Monety: ${this.coins}`, {
+        this.coinsText = this.add.text(cx, height / 2 - 207, `Monety: ${this.coins}`, {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffff88'
         }).setOrigin(0.5);
 
         // Basket grid area
-        this.basketGrid = this.add.container(width / 2, height / 2 - 100);
+        this.basketGrid = this.add.container(cx, height / 2 - 100);
         this.refreshGrid();
 
         // Sell button
-        this.sellBtn = this.add.text(width / 2, height / 2 + 95, '', {
+        this.sellBtn = this.add.text(cx, height / 2 + 95, '', {
             fontSize: '26px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#ffffff',
@@ -86,7 +89,7 @@ export class Skup extends Phaser.Scene {
         this.refreshSellButton();
 
         // Info text (items sold per click)
-        this.infoText = this.add.text(width / 2, height / 2 + 148, '', {
+        this.infoText = this.add.text(cx, height / 2 + 148, '', {
             fontSize: '15px',
             fontFamily: 'Arial, sans-serif',
             color: '#aaaaaa'
@@ -95,7 +98,7 @@ export class Skup extends Phaser.Scene {
 
         // Info about trash in basket (if any)
         if (this.trashBasket.length > 0) {
-            this.add.text(width / 2, height / 2 + 168, `🗑 ${this.trashBasket.length} śmieci w koszyku — wyrzuć je do kubła`, {
+            this.add.text(cx, height / 2 + 168, `🗑 ${this.trashBasket.length} śmieci w koszyku — wyrzuć je do kubła`, {
                 fontSize: '14px',
                 fontFamily: 'Arial, sans-serif',
                 color: '#aa8866'
@@ -103,7 +106,7 @@ export class Skup extends Phaser.Scene {
         }
 
         // Upgrade button: Szybka sprzedaż
-        this.upgradeBtn = this.add.text(width / 2, height / 2 + 200, '', {
+        this.upgradeBtn = this.add.text(cx, height / 2 + 200, '', {
             fontSize: '16px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffffff',
@@ -114,7 +117,7 @@ export class Skup extends Phaser.Scene {
         this.refreshUpgradeButton();
 
         // Back button
-        const backBtn = this.add.text(width / 2, height / 2 + 248, '← Wróć do gry', {
+        const backBtn = this.add.text(cx, height / 2 + 248, '← Wróć do gry', {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffffff',
@@ -147,27 +150,25 @@ export class Skup extends Phaser.Scene {
             const y = row * (size + gap);
 
             const fresh = item.spoilAt > this.time.now;
-            const color = fresh ? RESOURCE_COLORS[item.resourceType] : 0x555555;
-            const alpha = fresh ? 1 : 0.5;
+            const alpha = fresh ? 1 : 0.4;
 
-            const box = this.add.rectangle(x, y, size, size, color, alpha)
-                .setStrokeStyle(2, 0xffffff);
-            const label = this.add.text(x, y - 6, RESOURCE_NAMES_PL[item.resourceType as ResourceType] ?? '🗑', {
-                fontSize: '10px',
-                fontFamily: 'Arial, sans-serif',
-                color: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 2
-            }).setOrigin(0.5);
-            const pts = this.add.text(x, y + 10, `${item.points}pt`, {
-                fontSize: '13px',
+            const bg = this.add.rectangle(x, y, size, size, 0xfff5e0, 1)
+                .setStrokeStyle(2, fresh ? 0xaa8833 : 0x888888);
+
+            const imgKey = item.textureKey ?? (item.resourceType === 'trash' ? 'trash_banana' : item.resourceType);
+            const img = this.add.image(x, y - 4, imgKey)
+                .setAlpha(alpha);
+            const imgSize = size - 10;
+            const scale = Math.min(imgSize / img.width, (imgSize - 8) / img.height);
+            img.setScale(scale);
+
+            const pts = this.add.text(x, y + size / 2 - 9, item.resourceType === 'trash' ? '🗑' : `${item.points}pt`, {
+                fontSize: '11px',
                 fontFamily: 'Arial Black, sans-serif',
-                color: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 2
+                color: fresh ? '#553300' : '#888888',
             }).setOrigin(0.5);
 
-            this.basketGrid.add([box, label, pts]);
+            this.basketGrid.add([bg, img, pts]);
         });
 
         if (this.basket.length === 0) {

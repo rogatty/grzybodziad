@@ -47,9 +47,15 @@ export class CostumeShop extends Phaser.Scene {
             const owned = this.ownedCostumes.includes(costume.id);
             const active = this.activeCostume === costume.id;
 
-            // Color swatch
-            this.add.ellipse(width / 2 - 210, rowY, 36, 36, costume.color)
-                .setStrokeStyle(2, 0xffffff);
+            // Podgląd przebrania
+            if (costume.sprite) {
+                this.add.image(width / 2 - 210, rowY, costume.sprite)
+                    .setDisplaySize(32, 46)
+                    .setOrigin(0.5);
+            } else {
+                this.add.ellipse(width / 2 - 210, rowY, 36, 36, costume.color)
+                    .setStrokeStyle(2, 0xffffff);
+            }
 
             // Name
             this.add.text(width / 2 - 184, rowY, costume.namePL, {
