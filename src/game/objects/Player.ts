@@ -34,15 +34,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             };
         }
 
-        // Touch input: tap/drag to move
+        // Touch input: tap/drag to move (use world coordinates)
         scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             // Only handle if not clicking UI buttons (approximate: ignore top area)
             if (pointer.y < 60) return;
-            this.touchTarget = new Phaser.Math.Vector2(pointer.x, pointer.y);
+            this.touchTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
         });
         scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
             if (pointer.isDown) {
-                this.touchTarget = new Phaser.Math.Vector2(pointer.x, pointer.y);
+                this.touchTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
             }
         });
         scene.input.on('pointerup', () => {

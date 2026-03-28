@@ -141,8 +141,8 @@ export class Shop extends Phaser.Scene {
             const canAfford = !maxed && this.score >= cost;
 
             btn.setText(maxed ? 'MAX' : `Kup  (${cost} pkt)  Poziom: ${level}/${upgrade.maxLevel}`);
-            btn.removeInteractive();
-            btn.removeAllListeners();
+            btn.off('pointerover').off('pointerout').off('pointerdown');
+            btn.disableInteractive();
 
             if (maxed) {
                 btn.setStyle({ color: '#888888', backgroundColor: '#444444' });

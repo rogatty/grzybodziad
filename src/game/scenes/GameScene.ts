@@ -8,7 +8,10 @@ import {
     BASKET_BASE_CAPACITY,
     RESOURCE_TYPES,
     ResourceType,
-    RESOURCE_NAMES_PL
+    RESOURCE_NAMES_PL,
+    CAMERA_INITIAL_ZOOM,
+    WORLD_WIDTH,
+    WORLD_HEIGHT
 } from '../data/constants';
 import { UPGRADES } from '../data/upgrades';
 
@@ -35,6 +38,11 @@ export class GameScene extends Phaser.Scene {
     private spawnTimer!: Phaser.Time.TimerEvent;
     private roundTimer!: Phaser.Time.TimerEvent;
 
+    private zoomStage = 0;
+    private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+    private bgImage!: Phaser.GameObjects.TileSprite;
+    private stoneImages: Phaser.GameObjects.Image[] = [];
+
     constructor() {
         super('GameScene');
     }
@@ -44,9 +52,11 @@ export class GameScene extends Phaser.Scene {
         this.score = 0;
         this.timeLeft = this.registry.get('roundDuration') ?? ROUND_DURATION;
         this.resources = [];
+        this.stoneImages = [];
         this.hutEntered = false;
         this.basketCount = 0;
         this.basketPoints = 0;
+        this.zoomStage = 0;
 
         // Read upgrades from registry (set by Shop scene)
         const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
@@ -65,35 +75,39 @@ export class GameScene extends Phaser.Scene {
     create(): void {
         const { width, height } = this.scale;
 
-        // Background
-        this.add.image(width / 2, height / 2, 'background');
+        // Background — tiled across the full world
+        this.bgImage = this.add.tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH, WORLD_HEIGHT, 'background');
 
         // Stones — no physics bodies, manual circle collision in update()
         this.stoneList = [];
-        const stoneCount = 7;
+        const stoneCount = 28; // ~4x more stones for 4x larger world
         const forbiddenZones = [
-            { x: width / 2, y: height / 2, r: 100 },
-            { x: 580, y: 180, r: 90 },
+            { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, r: 100 },
+            { x: WORLD_WIDTH / 2 + 180, y: WORLD_HEIGHT / 2 - 120, r: 90 },
         ];
         let placed = 0;
         let attempts = 0;
-        while (placed < stoneCount && attempts < 200) {
+        while (placed < stoneCount && attempts < 800) {
             attempts++;
             const margin = 70;
-            const sx = Phaser.Math.Between(margin, width - margin);
-            const sy = Phaser.Math.Between(margin + 40, height - margin - 40);
+            const sx = Phaser.Math.Between(margin, WORLD_WIDTH - margin);
+            const sy = Phaser.Math.Between(margin + 40, WORLD_HEIGHT - margin - 40);
             const tooClose = forbiddenZones.some(z =>
                 Phaser.Math.Distance.Between(sx, sy, z.x, z.y) < z.r
             );
             if (tooClose) continue;
             const scale = Phaser.Math.FloatBetween(0.5, 1.6);
-            this.add.image(sx, sy, 'stone').setScale(scale).setDepth(3);
+            const stoneImg = this.add.image(sx, sy, 'stone').setScale(scale).setDepth(3);
+            this.stoneImages.push(stoneImg);
             this.stoneList.push({ x: sx, y: sy, radius: 20 * scale });
             placed++;
         }
 
+        // Extend physics world to match the full world size
+        this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
         // Player
-        this.player = new Player(this, width / 2, height / 2);
+        this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
         this.player.speed += this.registry.get('speedBonus') ?? 0;
         this.player.collectionRadius += this.registry.get('radiusBonus') ?? 0;
 
@@ -132,8 +146,8 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setOrigin(0.5).setDepth(20).setAlpha(0);
 
-        // Hut (shop entrance)
-        this.hut = this.add.image(580, 180, 'hut').setDepth(5);
+        // Hut (shop entrance) — near player start, same relative offset as before
+        this.hut = this.add.image(WORLD_WIDTH / 2 + 180, WORLD_HEIGHT / 2 - 120, 'hut').setDepth(5);
 
         // Listen for shop closing
         this.events.on('resume', (sys: Phaser.Scenes.Systems, data: { score?: number }) => {
@@ -158,6 +172,16 @@ export class GameScene extends Phaser.Scene {
             this.hutEntered = true;
         });
 
+        // Camera setup: main camera follows player, UI camera fixed
+        this.cameras.main.setZoom(CAMERA_INITIAL_ZOOM);
+        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+        this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        this.cameras.main.setBackgroundColor('#4a8a2a');
+        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText]);
+
+        this.uiCamera = this.cameras.add(0, 0, width, height);
+        this.uiCamera.ignore([this.bgImage, ...this.stoneImages, this.player, this.hut, this.collectText]);
+
         // Spawn resources periodically
         this.spawnTimer = this.time.addEvent({
             delay: RESOURCE_SPAWN_INTERVAL,
@@ -174,23 +198,27 @@ export class GameScene extends Phaser.Scene {
             loop: true
         });
 
-        // Initial spawn burst
-        for (let i = 0; i < 5; i++) {
-            this.spawnResource();
+        // Initial spawn burst near player
+        for (let i = 0; i < 10; i++) {
+            this.spawnResource(this.player.x, this.player.y);
         }
     }
 
-    private spawnResource(): void {
+    private spawnResource(nearX?: number, nearY?: number): void {
         const maxResources = MAX_RESOURCES_ON_SCREEN + (this.registry.get('maxResourcesBonus') ?? 0);
         if (this.resources.length >= maxResources) return;
 
-        const { width, height } = this.scale;
         const margin = 60;
         let x = 0, y = 0;
         let attempts = 0;
         do {
-            x = Phaser.Math.Between(margin, width - margin);
-            y = Phaser.Math.Between(margin + 40, height - margin - 40);
+            if (nearX !== undefined && nearY !== undefined) {
+                x = Phaser.Math.Clamp(nearX + Phaser.Math.Between(-380, 380), margin, WORLD_WIDTH - margin);
+                y = Phaser.Math.Clamp(nearY + Phaser.Math.Between(-280, 280), margin + 40, WORLD_HEIGHT - margin - 40);
+            } else {
+                x = Phaser.Math.Between(margin, WORLD_WIDTH - margin);
+                y = Phaser.Math.Between(margin + 40, WORLD_HEIGHT - margin - 40);
+            }
             attempts++;
         } while (
             attempts < 20 &&
@@ -207,6 +235,7 @@ export class GameScene extends Phaser.Scene {
 
         const resource = new Resource(this, x, y, type);
         this.resources.push(resource);
+        this.uiCamera.ignore(resource);
     }
 
     private tickTimer(): void {
@@ -217,13 +246,31 @@ export class GameScene extends Phaser.Scene {
             this.timerText.setColor('#ff4444');
         }
 
+        // Zoom out at 1/6, 1/3, 2/3 of round elapsed (= 5/6, 2/3, 1/3 remaining)
+        const duration = this.registry.get('roundDuration') ?? ROUND_DURATION;
+        const zoomThresholds = [
+            Math.round(duration * 5 / 6),
+            Math.round(duration * 2 / 3),
+            Math.round(duration * 1 / 3),
+        ];
+        if (this.zoomStage < 3 && this.timeLeft <= zoomThresholds[this.zoomStage]) {
+            this.zoomStage++;
+            const newZoom = CAMERA_INITIAL_ZOOM / Math.pow(1.5, this.zoomStage);
+            this.tweens.add({
+                targets: this.cameras.main,
+                zoom: newZoom,
+                duration: 1500,
+                ease: 'Sine.easeInOut'
+            });
+        }
+
         if (this.timeLeft <= 0) {
             this.endRound();
         }
     }
 
     private showCollectText(text: string): void {
-        this.collectText.setText(text).setAlpha(1).setY(this.player.y - 60);
+        this.collectText.setText(text).setAlpha(1).setPosition(this.player.x, this.player.y - 60);
         this.tweens.add({
             targets: this.collectText,
             y: this.player.y - 100,
