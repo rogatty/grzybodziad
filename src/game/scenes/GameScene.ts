@@ -6,6 +6,7 @@ import {
     MAX_RESOURCES_ON_SCREEN,
     ROUND_DURATION,
     BASKET_BASE_CAPACITY,
+    BASKET_SPOIL_TIME,
     RESOURCE_TYPES,
     ResourceType,
     RESOURCE_NAMES_PL,
@@ -21,19 +22,22 @@ export class GameScene extends Phaser.Scene {
     private stoneList: Array<{ x: number, y: number, radius: number }> = [];
 
     private score = 0;
+    private coins = 0;
     private timeLeft = ROUND_DURATION;
-    private basketCount = 0;
-    private basketPoints = 0;
+    private basket: Array<{ points: number; spoilAt: number }> = [];
     private basketCapacity = BASKET_BASE_CAPACITY;
 
     private scoreText!: Phaser.GameObjects.Text;
     private timerText!: Phaser.GameObjects.Text;
     private collectText!: Phaser.GameObjects.Text;
     private basketText!: Phaser.GameObjects.Text;
+    private coinsText!: Phaser.GameObjects.Text;
+    private freshnessGraphics!: Phaser.GameObjects.Graphics;
+
+    private lastBasketFullWarning = 0;
 
     private hut!: Phaser.GameObjects.Image;
     private hutEntered = false;
-    private lastBasketFullWarning = 0;
 
     private spawnTimer!: Phaser.Time.TimerEvent;
     private roundTimer!: Phaser.Time.TimerEvent;
@@ -42,6 +46,7 @@ export class GameScene extends Phaser.Scene {
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
     private bgImage!: Phaser.GameObjects.TileSprite;
     private stoneImages: Phaser.GameObjects.Image[] = [];
+    private fogOverlay!: Phaser.GameObjects.Image;
 
     constructor() {
         super('GameScene');
@@ -53,10 +58,13 @@ export class GameScene extends Phaser.Scene {
         this.timeLeft = this.registry.get('roundDuration') ?? ROUND_DURATION;
         this.resources = [];
         this.stoneImages = [];
+        this.basket = [];
         this.hutEntered = false;
-        this.basketCount = 0;
-        this.basketPoints = 0;
+        this.coins = 0;
         this.zoomStage = 0;
+
+        // Reset upgrades each round
+        this.registry.set('upgradeLevels', {});
 
         // Read upgrades from registry (set by Shop scene)
         const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
@@ -103,8 +111,9 @@ export class GameScene extends Phaser.Scene {
             placed++;
         }
 
-        // Extend physics world to match the full world size
-        this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        // Extend physics world to match the current zone
+        const zone0 = this.getZoneBounds(0);
+        this.physics.world.setBounds(zone0.x, zone0.y, zone0.w, zone0.h);
 
         // Player
         this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
@@ -138,6 +147,16 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setDepth(20);
 
+        this.coinsText = this.add.text(16, 80, 'Monety: 0', {
+            fontSize: '20px',
+            fontFamily: 'Arial, sans-serif',
+            color: '#ffdd44',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setDepth(20);
+
+        this.freshnessGraphics = this.add.graphics().setDepth(20);
+
         this.collectText = this.add.text(width / 2, height / 2 - 80, '', {
             fontSize: '28px',
             fontFamily: 'Arial Black, sans-serif',
@@ -150,10 +169,10 @@ export class GameScene extends Phaser.Scene {
         this.hut = this.add.image(WORLD_WIDTH / 2 + 180, WORLD_HEIGHT / 2 - 120, 'hut').setDepth(5);
 
         // Listen for shop closing
-        this.events.on('resume', (sys: Phaser.Scenes.Systems, data: { score?: number }) => {
-            if (data?.score !== undefined) {
-                this.score = data.score;
-                this.scoreText.setText(`Punkty: ${this.score}`);
+        this.events.on('resume', (sys: Phaser.Scenes.Systems, data: { coins?: number }) => {
+            if (data?.coins !== undefined) {
+                this.coins = data.coins;
+                this.coinsText.setText(`Monety: ${this.coins}`);
             }
             this.spawnTimer.paused = false;
             this.roundTimer.paused = false;
@@ -166,7 +185,7 @@ export class GameScene extends Phaser.Scene {
             this.player.speed = 200 + UPGRADES[0].effect(speedLevel);
             this.player.collectionRadius = 40 + UPGRADES[1].effect(radiusLevel);
             this.basketCapacity = BASKET_BASE_CAPACITY + UPGRADES[3].effect(basketLevel);
-            this.basketText.setText(`Koszyk: 0/${this.basketCapacity}`);
+            this.updateBasketUI();
 
             // Cooldown so player must walk away before re-entering
             this.hutEntered = true;
@@ -175,11 +194,18 @@ export class GameScene extends Phaser.Scene {
         // Camera setup: main camera follows player, UI camera fixed
         this.cameras.main.setZoom(CAMERA_INITIAL_ZOOM);
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-        this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        this.cameras.main.setBounds(zone0.x, zone0.y, zone0.w, zone0.h);
         this.cameras.main.setBackgroundColor('#4a8a2a');
-        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText]);
-
         this.uiCamera = this.cameras.add(0, 0, width, height);
+
+        // Fog overlay — on UI camera (fixed, no zoom), depth below UI text
+        this.createFogOverlay();
+        this.fogOverlay = this.add.image(width / 2, height / 2, 'fog_overlay').setDepth(15);
+
+        // Main camera ignores all UI elements (text + fog)
+        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.freshnessGraphics, this.fogOverlay]);
+
+        // UI camera ignores all game world objects (fog stays visible in UI camera)
         this.uiCamera.ignore([this.bgImage, ...this.stoneImages, this.player, this.hut, this.collectText]);
 
         // Spawn resources periodically
@@ -204,20 +230,65 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
+    private createFogOverlay(): void {
+        const w = this.scale.width;
+        const h = this.scale.height;
+        const key = 'fog_overlay';
+
+        if (this.textures.exists(key)) this.textures.remove(key);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+
+        // Dark green fog covering whole screen
+        ctx.fillStyle = '#0f2206';
+        ctx.fillRect(0, 0, w, h);
+
+        // Punch a soft elliptical window using destination-out
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.save();
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(w / h, 1); // stretch x axis to match screen aspect ratio → circle becomes ellipse
+
+        const r = h * 0.52; // radius in scaled space — larger = less dark corners
+        const grad = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r); // 0.8 = shorter transition (~half)
+        grad.addColorStop(0, 'rgba(0,0,0,1)'); // fully clear in center
+        grad.addColorStop(1, 'rgba(0,0,0,0)'); // opaque fog at edge
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        this.textures.addCanvas(key, canvas);
+    }
+
+    private getZoneBounds(stage: number): { x: number; y: number; w: number; h: number } {
+        const cx = WORLD_WIDTH / 2;
+        const cy = WORLD_HEIGHT / 2;
+        const w = Math.round(800 * Math.pow(1.5, stage));
+        const h = Math.round(600 * Math.pow(1.5, stage));
+        return { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h };
+    }
+
     private spawnResource(nearX?: number, nearY?: number): void {
         const maxResources = MAX_RESOURCES_ON_SCREEN + (this.registry.get('maxResourcesBonus') ?? 0);
         if (this.resources.length >= maxResources) return;
 
         const margin = 60;
+        const zone = this.getZoneBounds(this.zoomStage);
         let x = 0, y = 0;
         let attempts = 0;
         do {
             if (nearX !== undefined && nearY !== undefined) {
-                x = Phaser.Math.Clamp(nearX + Phaser.Math.Between(-380, 380), margin, WORLD_WIDTH - margin);
-                y = Phaser.Math.Clamp(nearY + Phaser.Math.Between(-280, 280), margin + 40, WORLD_HEIGHT - margin - 40);
+                x = Phaser.Math.Clamp(nearX + Phaser.Math.Between(-380, 380), zone.x + margin, zone.x + zone.w - margin);
+                y = Phaser.Math.Clamp(nearY + Phaser.Math.Between(-280, 280), zone.y + margin + 40, zone.y + zone.h - margin - 40);
             } else {
-                x = Phaser.Math.Between(margin, WORLD_WIDTH - margin);
-                y = Phaser.Math.Between(margin + 40, WORLD_HEIGHT - margin - 40);
+                x = Phaser.Math.Between(zone.x + margin, zone.x + zone.w - margin);
+                y = Phaser.Math.Between(zone.y + margin + 40, zone.y + zone.h - margin - 40);
             }
             attempts++;
         } while (
@@ -262,6 +333,9 @@ export class GameScene extends Phaser.Scene {
                 duration: 1500,
                 ease: 'Sine.easeInOut'
             });
+            const zone = this.getZoneBounds(this.zoomStage);
+            this.physics.world.setBounds(zone.x, zone.y, zone.w, zone.h);
+            this.cameras.main.setBounds(zone.x, zone.y, zone.w, zone.h);
         }
 
         if (this.timeLeft <= 0) {
@@ -283,12 +357,81 @@ export class GameScene extends Phaser.Scene {
     private endRound(): void {
         this.spawnTimer.remove();
         this.roundTimer.remove();
-        this.score += this.basketPoints;
+        // Add whatever is still fresh in basket to score
+        const remaining = this.basket.filter(item => item.spoilAt > this.time.now);
+        this.score += remaining.reduce((sum, item) => sum + item.points, 0);
         this.scene.start('GameOver', { score: this.score });
+    }
+
+    private updateBasketUI(): void {
+        const count = this.basket.length;
+        const full = count >= this.basketCapacity;
+        this.basketText.setText(`Koszyk: ${count}/${this.basketCapacity}`);
+        this.basketText.setColor(full ? '#ff4444' : '#ffcc44');
+    }
+
+    private drawFreshnessBars(now: number): void {
+        this.freshnessGraphics.clear();
+        const barW = 24;
+        const barH = 10;
+        const gap = 3;
+        const startX = 16;
+        const startY = 106;
+
+        for (let i = 0; i < this.basketCapacity; i++) {
+            const x = startX + i * (barW + gap);
+            // Background slot
+            this.freshnessGraphics.fillStyle(0x333333, 0.7);
+            this.freshnessGraphics.fillRect(x, startY, barW, barH);
+
+            if (i < this.basket.length) {
+                const remaining = (this.basket[i].spoilAt - now) / BASKET_SPOIL_TIME;
+                const fill = Math.max(0, Math.min(1, remaining));
+                const color = fill > 0.5 ? 0x44dd44 : fill > 0.25 ? 0xffdd00 : 0xff4444;
+                this.freshnessGraphics.fillStyle(color, 1);
+                this.freshnessGraphics.fillRect(x, startY, Math.round(barW * fill), barH);
+            }
+        }
+    }
+
+    private getFogSafeness(): number {
+        // Returns 1.0 inside safe zone, 0.0 at zone edge — elliptical, matches fog overlay
+        const zone = this.getZoneBounds(this.zoomStage);
+        const cx = zone.x + zone.w / 2;
+        const cy = zone.y + zone.h / 2;
+        const nx = (this.player.x - cx) / (zone.w / 2);
+        const ny = (this.player.y - cy) / (zone.h / 2);
+        const d = Math.sqrt(nx * nx + ny * ny);
+        const fogStart = 0.8; // fog begins at 80% of zone radius (matching overlay)
+        if (d <= fogStart) return 1;
+        return Math.max(0, 1 - (d - fogStart) / (1 - fogStart));
     }
 
     update(): void {
         this.player.update();
+
+        // Slow down only the outward velocity component in fog (tangential movement stays fast)
+        const safeness = this.getFogSafeness();
+        if (safeness < 1) {
+            const body = this.player.body as Phaser.Physics.Arcade.Body;
+            const zone = this.getZoneBounds(this.zoomStage);
+            const toCenterX = (zone.x + zone.w / 2) - this.player.x;
+            const toCenterY = (zone.y + zone.h / 2) - this.player.y;
+            const dist = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
+            if (dist > 0) {
+                // Unit vector pointing away from center
+                const outX = -toCenterX / dist;
+                const outY = -toCenterY / dist;
+                // How much of the velocity goes outward (positive = deeper into fog)
+                const outwardSpeed = body.velocity.x * outX + body.velocity.y * outY;
+                if (outwardSpeed > 0) {
+                    const slowFactor = safeness * safeness;
+                    const reduction = outwardSpeed * (1 - slowFactor);
+                    body.velocity.x -= reduction * outX;
+                    body.velocity.y -= reduction * outY;
+                }
+            }
+        }
 
         // Check if player enters the hut
         const hutDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.hut.x, this.hut.y);
@@ -297,25 +440,35 @@ export class GameScene extends Phaser.Scene {
                 this.hutEntered = true;
                 this.spawnTimer.paused = true;
                 this.roundTimer.paused = true;
-                // Convert basket to points
-                this.score += this.basketPoints;
-                this.basketPoints = 0;
-                this.basketCount = 0;
-                this.basketText.setText(`Koszyk: 0/${this.basketCapacity}`);
-                this.basketText.setColor('#ffcc44');
+                // Convert basket to points and coins
+                const sold = this.basket.reduce((sum, item) => sum + item.points, 0);
+                this.score += sold;
+                this.coins += sold;
+                this.basket = [];
+                this.updateBasketUI();
                 this.scoreText.setText(`Punkty: ${this.score}`);
+                this.coinsText.setText(`Monety: ${this.coins}`);
                 this.scene.pause('GameScene');
-                this.scene.launch('Shop', { score: this.score });
+                this.scene.launch('Shop', { coins: this.coins });
                 this.scene.bringToTop('Shop');
             }
         } else {
             this.hutEntered = false;
         }
 
+        // Spoil check — remove expired basket items
+        const now = this.time.now;
+        const beforeSpoil = this.basket.length;
+        this.basket = this.basket.filter(item => item.spoilAt > now);
+        if (this.basket.length < beforeSpoil) {
+            this.updateBasketUI();
+            this.showCollectText('🍂 Zepsuło się!');
+        }
+
         // Check collection by distance
         const r = this.player.collectionRadius;
         const collected: Resource[] = [];
-        const basketFull = this.basketCount >= this.basketCapacity;
+        const basketFull = this.basket.length >= this.basketCapacity;
         let nearResourceWhileFull = false;
         this.resources.forEach((resource) => {
             if (!resource.active) return;
@@ -328,11 +481,8 @@ export class GameScene extends Phaser.Scene {
                 return;
             }
             if (dist <= r && !basketFull) {
-                this.basketCount += 1;
-                this.basketPoints += resource.points;
-                const full = this.basketCount >= this.basketCapacity;
-                this.basketText.setText(`Koszyk: ${this.basketCount}/${this.basketCapacity}`);
-                this.basketText.setColor(full ? '#ff4444' : '#ffcc44');
+                this.basket.push({ points: resource.points, spoilAt: now + BASKET_SPOIL_TIME });
+                this.updateBasketUI();
                 this.showCollectText(`+${resource.points} ${RESOURCE_NAMES_PL[resource.resourceType]}`);
                 resource.collect();
                 collected.push(resource);
@@ -341,6 +491,9 @@ export class GameScene extends Phaser.Scene {
         if (collected.length > 0) {
             this.resources = this.resources.filter(r => !collected.includes(r));
         }
+
+        // Draw freshness bars
+        this.drawFreshnessBars(now);
 
         // Manual circle collision with stones
         const playerR = 12;

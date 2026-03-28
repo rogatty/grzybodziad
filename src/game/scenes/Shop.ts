@@ -2,13 +2,13 @@ import Phaser from 'phaser';
 import { UPGRADES, upgradeCost } from '../data/upgrades';
 
 interface ShopData {
-    score: number;
+    coins: number;
 }
 
 export class Shop extends Phaser.Scene {
-    private score = 0;
+    private coins = 0;
     private upgradeLevels: Record<string, number> = {};
-    private scoreText!: Phaser.GameObjects.Text;
+    private coinsText!: Phaser.GameObjects.Text;
     private upgradeTexts: Phaser.GameObjects.Text[] = [];
 
     constructor() {
@@ -16,7 +16,7 @@ export class Shop extends Phaser.Scene {
     }
 
     init(data: ShopData): void {
-        this.score = data.score ?? 0;
+        this.coins = data.coins ?? 0;
         this.upgradeLevels = this.registry.get('upgradeLevels') ?? {};
         this.upgradeTexts = [];
         // Ensure all upgrade ids exist
@@ -44,8 +44,8 @@ export class Shop extends Phaser.Scene {
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        // Score display
-        this.scoreText = this.add.text(width / 2, height / 2 - 165, `Twoje punkty: ${this.score}`, {
+        // Coins display
+        this.coinsText = this.add.text(width / 2, height / 2 - 165, `Twoje monety: ${this.coins}`, {
             fontSize: '22px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffff88'
@@ -79,7 +79,7 @@ export class Shop extends Phaser.Scene {
                 ? 'MAX'
                 : `Kup  (${cost} pkt)  Poziom: ${level}/${upgrade.maxLevel}`;
 
-            const canAfford = !maxed && this.score >= cost;
+            const canAfford = !maxed && this.coins >= cost;
             const btnColor = maxed ? '#888888' : (canAfford ? '#ffffff' : '#888888');
             const btnBg = maxed ? '#444444' : (canAfford ? '#336633' : '#553333');
 
@@ -122,13 +122,13 @@ export class Shop extends Phaser.Scene {
         const level = this.upgradeLevels[upgradeId] ?? 0;
         const cost = upgradeCost(upgrade, level);
 
-        if (this.score < cost || level >= upgrade.maxLevel) return;
+        if (this.coins < cost || level >= upgrade.maxLevel) return;
 
-        this.score -= cost;
+        this.coins -= cost;
         this.upgradeLevels[upgradeId] = level + 1;
         this.registry.set('upgradeLevels', { ...this.upgradeLevels });
 
-        this.scoreText.setText(`Twoje punkty: ${this.score}`);
+        this.coinsText.setText(`Twoje monety: ${this.coins}`);
         this.refreshButtons();
     }
 
@@ -138,7 +138,7 @@ export class Shop extends Phaser.Scene {
             const level = this.upgradeLevels[upgrade.id] ?? 0;
             const cost = upgradeCost(upgrade, level);
             const maxed = level >= upgrade.maxLevel;
-            const canAfford = !maxed && this.score >= cost;
+            const canAfford = !maxed && this.coins >= cost;
 
             btn.setText(maxed ? 'MAX' : `Kup  (${cost} pkt)  Poziom: ${level}/${upgrade.maxLevel}`);
             btn.off('pointerover').off('pointerout').off('pointerdown');
@@ -159,7 +159,7 @@ export class Shop extends Phaser.Scene {
     }
 
     private closeShop(): void {
-        this.scene.resume('GameScene', { score: this.score });
+        this.scene.resume('GameScene', { coins: this.coins });
         this.scene.stop('Shop');
     }
 }

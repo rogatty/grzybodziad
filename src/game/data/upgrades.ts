@@ -12,7 +12,7 @@ export const UPGRADES: Upgrade[] = [
         id: 'speed',
         namePL: 'Szybkie buty',
         descriptionPL: 'Biegnij szybciej po łące!',
-        baseCost: 5,
+        baseCost: 4,
         maxLevel: 5,
         effect: (level) => level * 40 // +40 speed per level
     },
@@ -20,7 +20,7 @@ export const UPGRADES: Upgrade[] = [
         id: 'radius',
         namePL: 'Duży koszyk',
         descriptionPL: 'Zbieraj z większej odległości!',
-        baseCost: 6,
+        baseCost: 4,
         maxLevel: 4,
         effect: (level) => level * 20 // +20px radius per level
     },
@@ -28,7 +28,7 @@ export const UPGRADES: Upgrade[] = [
         id: 'spawns',
         namePL: 'Szczęśliwa łąka',
         descriptionPL: 'Więcej roślin wyrasta na łące!',
-        baseCost: 8,
+        baseCost: 5,
         maxLevel: 3,
         effect: (level) => level * 3 // +3 max resources per level
     },
@@ -36,7 +36,7 @@ export const UPGRADES: Upgrade[] = [
         id: 'basket',
         namePL: 'Pojemny koszyk',
         descriptionPL: 'Więcej miejsca w koszyku!',
-        baseCost: 5,
+        baseCost: 4,
         maxLevel: 4,
         effect: (level) => level * 3 // +3 capacity per level
     }

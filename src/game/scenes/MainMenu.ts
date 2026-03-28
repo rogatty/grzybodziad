@@ -26,38 +26,21 @@ export class MainMenu extends Phaser.Scene {
             color: '#ffffaa'
         }).setOrigin(0.5);
 
-        // Time selection label
-        this.add.text(width / 2, height / 2 + 20, 'Ile czasu na rundę?', {
-            fontSize: '22px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffffaa'
-        }).setOrigin(0.5);
+        const playBtn = this.add.text(width / 2, height / 2 + 60, '▶  GRAJ', {
+            fontSize: '32px',
+            fontFamily: 'Arial Black, sans-serif',
+            color: '#ffffff',
+            backgroundColor: '#227722',
+            padding: { x: 36, y: 16 }
+        })
+            .setOrigin(0.5)
+            .setInteractive({ useHandCursor: true });
 
-        const timeOptions = [
-            { label: '1 minuta\n(szybki test)', seconds: 60 },
-            { label: '2 minuty', seconds: 120 },
-            { label: '3 minuty\n(dobra zabawa!)', seconds: 180 },
-        ];
-
-        timeOptions.forEach((option, i) => {
-            const x = width / 2 - 200 + i * 200;
-            const btn = this.add.text(x, height / 2 + 110, option.label, {
-                fontSize: '18px',
-                fontFamily: 'Arial Black, sans-serif',
-                color: '#ffffff',
-                backgroundColor: '#227722',
-                padding: { x: 18, y: 12 },
-                align: 'center'
-            })
-                .setOrigin(0.5)
-                .setInteractive({ useHandCursor: true });
-
-            btn.on('pointerover', () => btn.setStyle({ backgroundColor: '#33aa33' }));
-            btn.on('pointerout', () => btn.setStyle({ backgroundColor: '#227722' }));
-            btn.on('pointerdown', () => {
-                this.registry.set('roundDuration', option.seconds);
-                this.scene.start('GameScene');
-            });
+        playBtn.on('pointerover', () => playBtn.setStyle({ backgroundColor: '#33aa33' }));
+        playBtn.on('pointerout', () => playBtn.setStyle({ backgroundColor: '#227722' }));
+        playBtn.on('pointerdown', () => {
+            this.registry.set('roundDuration', 180);
+            this.scene.start('GameScene');
         });
 
         // Bounce animation on title

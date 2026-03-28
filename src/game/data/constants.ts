@@ -3,6 +3,7 @@ export const CAMERA_INITIAL_ZOOM = 1.0;
 export const WORLD_WIDTH = 2700;  // 800 * 1.5^3 — fits 3 zoom-out steps
 export const WORLD_HEIGHT = 2025; // 600 * 1.5^3
 export const BASKET_BASE_CAPACITY = 5;
+export const BASKET_SPOIL_TIME = 15000; // ms — resource spoils if not sold within 15s
 export const COLLECTION_RADIUS = 40;
 export const RESOURCE_SPAWN_INTERVAL = 2000; // ms
 export const MAX_RESOURCES_ON_SCREEN = 80; // scaled for larger world (2700x2025)
