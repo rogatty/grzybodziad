@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
+import { TRASH_TEXTURES } from '../data/constants';
 
 export class Trash extends Phaser.Physics.Arcade.Sprite {
     constructor(scene: Phaser.Scene, x: number, y: number) {
-        super(scene, x, y, 'trash');
+        const key = TRASH_TEXTURES[Math.floor(Math.random() * TRASH_TEXTURES.length)];
+        super(scene, x, y, key);
 
         scene.add.existing(this);
 

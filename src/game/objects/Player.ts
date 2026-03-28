@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PLAYER_BASE_SPEED, COLLECTION_RADIUS } from '../data/constants';
+import { COSTUMES, DEFAULT_COSTUME_ID } from '../data/costumes';
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
@@ -16,6 +17,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Touch movement
     private touchTarget: Phaser.Math.Vector2 | null = null;
 
+    // Colored ellipse drawn behind the outline sprite
+    readonly bodyFill: Phaser.GameObjects.Ellipse;
+
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y, 'player');
         scene.add.existing(this);
@@ -23,6 +27,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.setCollideWorldBounds(true);
         this.setDepth(10);
+
+        // Colored fill sits just behind the outline
+        const costumeKey: string = scene.registry.get('activeCostume') ?? DEFAULT_COSTUME_ID;
+        const color = COSTUMES.find(c => c.id === costumeKey)?.color ?? COSTUMES[0].color;
+        this.bodyFill = scene.add.ellipse(x, y, 56, 80, color).setDepth(9);
 
         if (scene.input.keyboard) {
             this.cursors = scene.input.keyboard.createCursorKeys();
@@ -48,6 +57,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         scene.input.on('pointerup', () => {
             this.touchTarget = null;
         });
+    }
+
+    setCostume(costumeKey: string): void {
+        const color = COSTUMES.find(c => c.id === costumeKey)?.color ?? COSTUMES[0].color;
+        this.bodyFill.setFillStyle(color);
+        this.scene.registry.set('activeCostume', costumeKey);
     }
 
     update(): void {
@@ -91,6 +106,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         }
 
         body.setVelocity(vx, vy);
+
+        // Keep fill ellipse under the player
+        this.bodyFill.setPosition(this.x, this.y + 8);
 
         // Flip sprite based on direction
         if (vx < 0) this.setFlipX(true);

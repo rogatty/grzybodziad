@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
-import { ResourceType, RESOURCE_POINTS } from '../data/constants';
+import { ResourceType, RESOURCE_POINTS, RESOURCE_TEXTURES } from '../data/constants';
 
 export class Resource extends Phaser.Physics.Arcade.Sprite {
     readonly resourceType: ResourceType;
     readonly points: number;
 
     constructor(scene: Phaser.Scene, x: number, y: number, type: ResourceType) {
-        super(scene, x, y, type);
+        const variants = RESOURCE_TEXTURES[type];
+        const textureKey = variants[Math.floor(Math.random() * variants.length)];
+        super(scene, x, y, textureKey);
         this.resourceType = type;
         this.points = RESOURCE_POINTS[type];
 

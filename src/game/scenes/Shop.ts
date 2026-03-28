@@ -93,7 +93,7 @@ export class Shop extends Phaser.Scene {
             const cost = upgradeCost(upgrade, level);
             const maxed = level >= upgrade.maxLevel;
 
-            const btnLabel = maxed ? 'MAX' : `Kup (${cost} pkt)`;
+            const btnLabel = maxed ? 'MAX' : `Kup (${cost} monet)`;
             const canAfford = !maxed && this.coins >= cost;
             const btnColor = maxed ? '#888888' : (canAfford ? '#ffffff' : '#888888');
             const btnBg = maxed ? '#444444' : (canAfford ? '#336633' : '#553333');
@@ -187,7 +187,7 @@ export class Shop extends Phaser.Scene {
             const maxed = level >= upgrade.maxLevel;
             const canAfford = !maxed && this.coins >= cost;
 
-            btn.setText(maxed ? 'MAX' : `Kup (${cost} pkt)`);
+            btn.setText(maxed ? 'MAX' : `Kup (${cost} monet)`);
             this.upgradeLevelTexts[i].setText(`${level}/${upgrade.maxLevel}`);
             btn.off('pointerover').off('pointerout').off('pointerdown');
             btn.disableInteractive();

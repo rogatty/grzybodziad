@@ -14,6 +14,14 @@ export const ROUND_DURATION = 180; // seconds
 export const RESOURCE_TYPES = ['mushroom', 'berry', 'flower'] as const;
 export type ResourceType = typeof RESOURCE_TYPES[number];
 
+export const RESOURCE_TEXTURES: Record<ResourceType, string[]> = {
+    mushroom: ['mushroom1', 'mushroom2', 'mushroom3', 'mushroom4', 'mushroom5', 'mushroom6'],
+    berry:    ['berry'],
+    flower:   ['flower1', 'flower2', 'flower3'],
+};
+
+export const TRASH_TEXTURES = ['trash_banana', 'trash_bottle'];
+
 export const RESOURCE_POINTS: Record<ResourceType, number> = {
     mushroom: 1,
     berry: 2,

@@ -9,48 +9,6 @@ export class Boot extends Phaser.Scene {
         // Generate placeholder textures as colored shapes
         // These will be replaced by real hand-drawn art later
 
-        // Player: green circle
-        const playerGfx = this.make.graphics({ x: 0, y: 0 });
-        playerGfx.fillStyle(0x44aa44);
-        playerGfx.fillCircle(32, 32, 28);
-        playerGfx.fillStyle(0x88ff88);
-        playerGfx.fillCircle(24, 20, 8); // head highlight
-        playerGfx.generateTexture('player', 64, 64);
-        playerGfx.destroy();
-
-        // Mushroom: red cap with white dots
-        const mushroomGfx = this.make.graphics({ x: 0, y: 0 });
-        mushroomGfx.fillStyle(0xdd2222);
-        mushroomGfx.fillCircle(16, 12, 14);
-        mushroomGfx.fillStyle(0xffffff);
-        mushroomGfx.fillCircle(10, 10, 4);
-        mushroomGfx.fillCircle(20, 7, 3);
-        mushroomGfx.fillStyle(0xf5deb3);
-        mushroomGfx.fillRect(10, 20, 12, 10);
-        mushroomGfx.generateTexture('mushroom', 32, 32);
-        mushroomGfx.destroy();
-
-        // Berry: blue circle with shine
-        const berryGfx = this.make.graphics({ x: 0, y: 0 });
-        berryGfx.fillStyle(0x3355cc);
-        berryGfx.fillCircle(12, 12, 11);
-        berryGfx.fillStyle(0x88aaff);
-        berryGfx.fillCircle(8, 8, 4);
-        berryGfx.generateTexture('berry', 24, 24);
-        berryGfx.destroy();
-
-        // Flower: yellow petals
-        const flowerGfx = this.make.graphics({ x: 0, y: 0 });
-        flowerGfx.fillStyle(0xffdd00);
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            flowerGfx.fillCircle(14 + Math.cos(angle) * 8, 14 + Math.sin(angle) * 8, 5);
-        }
-        flowerGfx.fillStyle(0xff8800);
-        flowerGfx.fillCircle(14, 14, 5);
-        flowerGfx.generateTexture('flower', 28, 28);
-        flowerGfx.destroy();
-
         // Upgrade icon: speed — boot with jetpack
         const speedGfx = this.make.graphics({ x: 0, y: 0 });
         // Boot
@@ -159,17 +117,6 @@ export class Boot extends Phaser.Scene {
         basketGfx.generateTexture('upgrade-basket', 64, 64);
         basketGfx.destroy();
 
-        // Trash: crumpled gray-brown ball
-        const trashGfx = this.make.graphics({ x: 0, y: 0 });
-        trashGfx.fillStyle(0x998866);
-        trashGfx.fillCircle(14, 14, 11);
-        trashGfx.fillStyle(0x776644);
-        trashGfx.fillRect(10, 12, 4, 3);
-        trashGfx.fillRect(16, 10, 3, 5);
-        trashGfx.fillRect(12, 17, 5, 3);
-        trashGfx.generateTexture('trash', 28, 28);
-        trashGfx.destroy();
-
         // Trash bin: green bin with lid
         const binGfx = this.make.graphics({ x: 0, y: 0 });
         // Body
@@ -251,6 +198,56 @@ export class Boot extends Phaser.Scene {
         }
         bgGfx.generateTexture('background', 800, 600);
         bgGfx.destroy();
+
+        // Skup (market): wooden stall with coin sign
+        const skupGfx = this.make.graphics({ x: 0, y: 0 });
+        // Roof / awning
+        skupGfx.fillStyle(0xcc7722);
+        skupGfx.fillRect(2, 10, 60, 10);
+        skupGfx.fillStyle(0xaa5500);
+        skupGfx.fillTriangle(2, 10, 32, 2, 62, 10);
+        // Counter
+        skupGfx.fillStyle(0xd4a055);
+        skupGfx.fillRect(6, 20, 52, 28);
+        skupGfx.fillStyle(0xb07835);
+        skupGfx.fillRect(6, 20, 52, 5);
+        // Legs
+        skupGfx.fillStyle(0x8b5e1a);
+        skupGfx.fillRect(8, 48, 6, 16);
+        skupGfx.fillRect(50, 48, 6, 16);
+        // Coin symbol
+        skupGfx.fillStyle(0xffdd00);
+        skupGfx.fillCircle(32, 34, 10);
+        skupGfx.fillStyle(0xcc9900);
+        skupGfx.fillCircle(32, 34, 6);
+        skupGfx.fillStyle(0xffdd00);
+        skupGfx.fillCircle(32, 34, 3);
+        skupGfx.generateTexture('skup_hut', 64, 64);
+        skupGfx.destroy();
+
+        // Costume shop: colorful small hut with rainbow roof
+        const costumeHutGfx = this.make.graphics({ x: 0, y: 0 });
+        // Walls
+        costumeHutGfx.fillStyle(0xfff0cc);
+        costumeHutGfx.fillRect(8, 36, 48, 30);
+        // Roof — rainbow stripes
+        const roofColors = [0xe15554, 0xff6b35, 0xf4d35e, 0x6bcb77, 0x4d9de0, 0x9b5de5];
+        roofColors.forEach((c, i) => {
+            costumeHutGfx.fillStyle(c);
+            costumeHutGfx.fillTriangle(
+                32, 4,
+                Math.max(4, 32 - (i + 1) * 5), 38,
+                Math.min(60, 32 + (i + 1) * 5), 38
+            );
+        });
+        // Door
+        costumeHutGfx.fillStyle(0x8b5a2b);
+        costumeHutGfx.fillRect(24, 46, 14, 20);
+        // Sign (star shape)
+        costumeHutGfx.fillStyle(0xffdd00);
+        costumeHutGfx.fillCircle(44, 44, 5);
+        costumeHutGfx.generateTexture('costume_hut', 64, 66);
+        costumeHutGfx.destroy();
 
         this.scene.start('Preloader');
     }

@@ -4,6 +4,8 @@ import { Preloader } from './scenes/Preloader';
 import { MainMenu } from './scenes/MainMenu';
 import { GameScene } from './scenes/GameScene';
 import { Shop } from './scenes/Shop';
+import { CostumeShop } from './scenes/CostumeShop';
+import { Skup } from './scenes/Skup';
 import { GameOver } from './scenes/GameOver';
 
 export function StartGame(containerId: string): Phaser.Game {
@@ -24,6 +26,6 @@ export function StartGame(containerId: string): Phaser.Game {
                 debug: false
             }
         },
-        scene: [Boot, Preloader, MainMenu, GameScene, Shop, GameOver]
+        scene: [Boot, Preloader, MainMenu, GameScene, Shop, CostumeShop, Skup, GameOver]
     });
 }
