@@ -43,7 +43,7 @@ export const UPGRADES: Upgrade[] = [
     {
         id: 'trashbag',
         namePL: 'Worek na śmieci',
-        descriptionPL: 'Śmieci nie zajmują miejsca w koszyku!',
+        descriptionPL: 'Śmieci trafiają do worka, nie koszyka!',
         baseCost: 5,
         maxLevel: 4,
         effect: (level) => level * 3 // capacity (0 = no bag)
