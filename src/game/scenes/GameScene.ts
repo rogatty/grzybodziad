@@ -131,7 +131,7 @@ export class GameScene extends Phaser.Scene {
         this.resources = [];
 
         // UI
-        this.scoreText = this.add.text(16, 16, 'Punkty: 0', {
+        this.scoreText = this.add.text(16, 16, '🏆 0', {
             fontSize: '24px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffffff',
@@ -147,7 +147,7 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setOrigin(1, 0).setDepth(20);
 
-        this.basketText = this.add.text(16, 50, `Koszyk: 0/${this.basketCapacity}`, {
+        this.basketText = this.add.text(16, 50, `🧺 0/${this.basketCapacity}`, {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffcc44',
@@ -155,7 +155,7 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setDepth(20);
 
-        this.coinsText = this.add.text(16, 80, 'Monety: 0', {
+        this.coinsText = this.add.text(16, 80, '💵 0', {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffdd44',
@@ -176,12 +176,15 @@ export class GameScene extends Phaser.Scene {
 
         // Hut (shop entrance) — near player start, same relative offset as before
         this.hut = this.add.image(WORLD_WIDTH / 2 + 180, WORLD_HEIGHT / 2 - 120, 'hut').setDepth(5);
+        this.hut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
         // Costume shop — on the other side of the player start
         this.costumeHut = this.add.image(WORLD_WIDTH / 2 - 180, WORLD_HEIGHT / 2 - 120, 'costume_hut').setDepth(5);
+        this.costumeHut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
         // Skup (resource market) — below player start
         this.skupHut = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2 + 160, 'skup_hut').setDepth(5);
+        this.skupHut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
 
         // Listen for shop/costume-shop/skup closing
@@ -192,7 +195,7 @@ export class GameScene extends Phaser.Scene {
         }) => {
             if (data?.coins !== undefined) {
                 this.coins = data.coins;
-                this.coinsText.setText(`Monety: ${this.coins}`);
+                this.coinsText.setText(`💵 ${this.coins}`);
             }
 
             if (data?.fromSkup) {
@@ -203,7 +206,7 @@ export class GameScene extends Phaser.Scene {
                 }
                 if (data.score !== undefined) {
                     this.score = data.score;
-                    this.scoreText.setText(`Punkty: ${this.score}`);
+                    this.scoreText.setText(`🏆 ${this.score}`);
                 }
                 this.skupHutEntered = true;
                 this.skupHutOnCooldown = true;
@@ -254,7 +257,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.setZoom(CAMERA_INITIAL_ZOOM);
         this.cameras.main.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
         this.cameras.main.setBounds(zone0.x, zone0.y, zone0.w, zone0.h);
-        this.cameras.main.setBackgroundColor('#4a8a2a');
+        this.cameras.main.setBackgroundColor('#6abf5e');
         this.uiCamera = this.cameras.add(0, 0, width, height);
 
         // Fog overlay — on UI camera (fixed, no zoom), depth below UI text
@@ -265,7 +268,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay]);
 
         // UI camera ignores all game world objects (fog stays visible in UI camera)
-        this.uiCamera.ignore([this.bgImage, this.player, this.player.bodyFill, this.hut, this.costumeHut, this.skupHut]);
+        this.uiCamera.ignore([this.bgImage, this.player, this.hut, this.costumeHut, this.skupHut]);
 
         // Add first bin after cameras are set up (so uiCamera.ignore works)
         this.addTrashBin(0);
@@ -414,6 +417,7 @@ export class GameScene extends Phaser.Scene {
         if ([this.hut, this.costumeHut, this.skupHut].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 150)) return;
 
         const bin = this.add.image(x, y, 'trashbin').setDepth(5);
+        bin.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
         this.trashBins.push(bin);
         this.uiCamera.ignore(bin);
     }
@@ -508,6 +512,30 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
+    private flyToBasket(textureKey: string, worldX: number, worldY: number): void {
+        const cam = this.cameras.main;
+        const screenX = (worldX - cam.worldView.x) * cam.zoom;
+        const screenY = (worldY - cam.worldView.y) * cam.zoom;
+        if (screenX < -40 || screenX > this.scale.width + 40 || screenY < -40 || screenY > this.scale.height + 40) return;
+
+        const img = this.add.image(screenX, screenY, textureKey)
+            .setDisplaySize(30, 30)
+            .setDepth(25);
+        this.cameras.main.ignore(img);
+
+        this.tweens.add({
+            targets: img,
+            x: 30,
+            y: 111,
+            displayWidth: 10,
+            displayHeight: 10,
+            alpha: 0.7,
+            duration: 400,
+            ease: 'Quad.in',
+            onComplete: () => img.destroy()
+        });
+    }
+
     private endRound(): void {
         this.spawnTimer.remove();
         this.roundTimer.remove();
@@ -521,7 +549,7 @@ export class GameScene extends Phaser.Scene {
     private updateBasketUI(): void {
         const count = this.basket.length;
         const full = count >= this.basketCapacity;
-        this.basketText.setText(`Koszyk: ${count}/${this.basketCapacity}`);
+        this.basketText.setText(`🧺 ${count}/${this.basketCapacity}`);
         this.basketText.setColor(full ? '#ff4444' : '#ffcc44');
     }
 
@@ -662,7 +690,7 @@ export class GameScene extends Phaser.Scene {
                     this.updateTrashBagUI();
                     if (earned > 0) {
                         this.coins += earned;
-                        this.coinsText.setText(`Monety: ${this.coins}`);
+                        this.coinsText.setText(`💵 ${this.coins}`);
                         this.showCollectText(`♻️ +${earned} monet!`);
                     } else {
                         this.showCollectText('♻️ Śmieci wyrzucone!');
@@ -700,7 +728,7 @@ export class GameScene extends Phaser.Scene {
             if (dist <= r && !basketFull) {
                 this.basket.push({ points: resource.points, spoilAt: now + BASKET_SPOIL_TIME, resourceType: resource.resourceType, textureKey: resource.texture.key });
                 this.updateBasketUI();
-                this.showCollectText(`+${resource.points} ${RESOURCE_NAMES_PL[resource.resourceType]}`);
+                this.flyToBasket(resource.texture.key, resource.x, resource.y);
                 resource.collect();
                 collected.push(resource);
             }

@@ -7,15 +7,11 @@ export class Trash extends Phaser.Physics.Arcade.Sprite {
         super(scene, x, y, key);
 
         scene.add.existing(this);
+        this.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
         // Spawn animation
         this.setScale(0);
-        scene.tweens.add({
-            targets: this,
-            scale: 1,
-            duration: 300,
-            ease: 'Back.out'
-        });
+        scene.tweens.add({ targets: this, scale: 1, duration: 300, ease: 'Back.out' });
 
         // Gentle wobble
         scene.tweens.add({

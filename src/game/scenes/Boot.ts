@@ -187,9 +187,9 @@ export class Boot extends Phaser.Scene {
 
         // Background tile: green meadow
         const bgGfx = this.make.graphics({ x: 0, y: 0 });
-        bgGfx.fillStyle(0x3a7d35);
+        bgGfx.fillStyle(0x6abf5e);
         bgGfx.fillRect(0, 0, 800, 600);
-        bgGfx.fillStyle(0x2d6028);
+        bgGfx.fillStyle(0x4e9e42);
         for (let i = 0; i < 40; i++) {
             const x = Math.random() * 800;
             const y = Math.random() * 600;

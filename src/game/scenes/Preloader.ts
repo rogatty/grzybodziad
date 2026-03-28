@@ -38,6 +38,12 @@ export class Preloader extends Phaser.Scene {
 
         this.load.image('trash_banana', 'assets/trash_banana.png');
         this.load.image('trash_bottle', 'assets/trash_bottle.png');
+
+        for (let i = 1; i <= 6; i++) {
+            this.load.image(`key_${i}`, `assets/keys/${i}.png`);
+        }
+        this.load.image('key_space', 'assets/keys/space.png');
+        this.load.image('key_empty', 'assets/keys/empty.png');
     }
 
     create(): void {

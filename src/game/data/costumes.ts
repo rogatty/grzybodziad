@@ -7,7 +7,7 @@ export interface Costume {
 }
 
 export const COSTUMES: Costume[] = [
-    { id: 'domyslne',      namePL: 'Domyślne',      color: 0x6bcb77, cost: 0  },
+    { id: 'domyslne',      namePL: 'Zwyklak',       sprite: 'player', color: 0x6bcb77, cost: 0  },
     { id: 'niebieskie',    namePL: 'Niebieskie',    sprite: 'costume1', color: 0x4d9de0, cost: 10 },
     { id: 'kapelusznik',   namePL: 'Kapelusznik',   sprite: 'costume2', color: 0x9b5de5, cost: 15 },
     { id: 'szaraczek',     namePL: 'Szaraczek',     sprite: 'costume3', color: 0x888888, cost: 10 },

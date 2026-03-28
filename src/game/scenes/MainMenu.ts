@@ -38,10 +38,16 @@ export class MainMenu extends Phaser.Scene {
 
         playBtn.on('pointerover', () => playBtn.setStyle({ backgroundColor: '#33aa33' }));
         playBtn.on('pointerout', () => playBtn.setStyle({ backgroundColor: '#227722' }));
-        playBtn.on('pointerdown', () => {
+        const startGame = () => {
             this.registry.set('roundDuration', 180);
             this.scene.start('GameScene');
-        });
+        };
+        playBtn.on('pointerdown', startGame);
+
+        // Space key hint below play button
+        this.add.image(width / 2, height / 2 + 120, 'key_space').setDisplaySize(100, 24);
+
+        this.input.keyboard!.on('keydown-SPACE', startGame);
 
         // Bounce animation on title
         this.tweens.add({

@@ -27,19 +27,19 @@ export class CostumeShop extends Phaser.Scene {
         const { width, height } = this.scale;
 
         this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
-        this.add.rectangle(width / 2, height / 2, 520, 560, 0x2a1a3e, 0.95)
-            .setStrokeStyle(3, 0xcc88ff);
+        this.add.rectangle(width / 2, height / 2, 520, 560, 0xfff5e0, 1)
+            .setStrokeStyle(3, 0xffcc44);
 
-        this.add.text(width / 2, height / 2 - 250, '👗  Sklep z przebraniami', {
+        this.add.text(width / 2, height / 2 - 250, 'Przebrania', {
             fontSize: '30px',
             fontFamily: 'Arial Black, sans-serif',
-            color: '#ffffff'
+            color: '#553300'
         }).setOrigin(0.5);
 
-        this.coinsText = this.add.text(width / 2, height / 2 - 212, `Twoje monety: ${this.coins}`, {
+        this.coinsText = this.add.text(width / 2, height / 2 - 212, `💵 ${this.coins}`, {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
-            color: '#ffff88'
+            color: '#553300'
         }).setOrigin(0.5);
 
         COSTUMES.forEach((costume, i) => {
@@ -61,17 +61,8 @@ export class CostumeShop extends Phaser.Scene {
             this.add.text(width / 2 - 184, rowY, costume.namePL, {
                 fontSize: '20px',
                 fontFamily: 'Arial Black, sans-serif',
-                color: '#ffffff'
+                color: '#553300'
             }).setOrigin(0, 0.5);
-
-            // Price tag (only if not owned)
-            if (!owned) {
-                this.add.text(width / 2 + 40, rowY, `${costume.cost} monet`, {
-                    fontSize: '15px',
-                    fontFamily: 'Arial, sans-serif',
-                    color: '#ffdd88'
-                }).setOrigin(0, 0.5);
-            }
 
             // Action button
             const btnLabel = active ? '✓ Ubrane' : (owned ? 'Ubierz' : `Kup (${costume.cost})`);
@@ -112,7 +103,7 @@ export class CostumeShop extends Phaser.Scene {
         backBtn.on('pointerdown', () => this.close());
 
         this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
-            if (event.key === 'Backspace' || event.key === 'Escape') this.close();
+            if (event.key === 'Escape') this.close();
         });
     }
 
@@ -125,7 +116,7 @@ export class CostumeShop extends Phaser.Scene {
             this.coins -= costume.cost;
             this.ownedCostumes = [...this.ownedCostumes, id];
             this.registry.set('ownedCostumes', this.ownedCostumes);
-            this.coinsText.setText(`Twoje monety: ${this.coins}`);
+            this.coinsText.setText(`💵 ${this.coins}`);
         }
 
         this.activeCostume = id;

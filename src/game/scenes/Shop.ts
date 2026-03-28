@@ -36,21 +36,21 @@ export class Shop extends Phaser.Scene {
         this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
 
         // Panel — wider to fit key badges without overlap
-        this.add.rectangle(width / 2, height / 2, 580, 550, 0x1a1a3e, 0.95)
-            .setStrokeStyle(3, 0x8888ff);
+        this.add.rectangle(width / 2, height / 2, 580, 550, 0xfff5e0, 1)
+            .setStrokeStyle(3, 0xffcc44);
 
         // Title
         this.add.text(width / 2, height / 2 - 245, '🛍  Sklep', {
             fontSize: '36px',
             fontFamily: 'Arial Black, sans-serif',
-            color: '#ffffff'
+            color: '#553300'
         }).setOrigin(0.5);
 
         // Coins display
-        this.coinsText = this.add.text(width / 2, height / 2 - 205, `Twoje monety: ${this.coins}`, {
+        this.coinsText = this.add.text(width / 2, height / 2 - 205, `💵 ${this.coins}`, {
             fontSize: '22px',
             fontFamily: 'Arial, sans-serif',
-            color: '#ffff88'
+            color: '#553300'
         }).setOrigin(0.5);
 
         // Upgrade rows
@@ -61,15 +61,7 @@ export class Shop extends Phaser.Scene {
             const rowY = height / 2 - 155 + i * 65;
 
             // Key badge
-            this.add.text(width / 2 - 268, rowY, `${i + 1}`, {
-                fontSize: '15px',
-                fontFamily: 'Arial Black, sans-serif',
-                color: '#ddddff',
-                backgroundColor: '#3a3a6a',
-                padding: { x: 7, y: 5 },
-                stroke: '#6666aa',
-                strokeThickness: 2
-            }).setOrigin(0.5);
+            this.add.image(width / 2 - 268, rowY, `key_${i + 1}`).setDisplaySize(28, 26);
 
             // Icon
             this.add.image(width / 2 - 228, rowY, upgradeIcons[i]).setDisplaySize(48, 48);
@@ -78,14 +70,14 @@ export class Shop extends Phaser.Scene {
             this.add.text(width / 2 - 196, rowY - 14, upgrade.namePL, {
                 fontSize: '19px',
                 fontFamily: 'Arial Black, sans-serif',
-                color: '#ffffff'
+                color: '#553300'
             });
 
             // Description
             this.add.text(width / 2 - 196, rowY + 9, upgrade.descriptionPL, {
                 fontSize: '13px',
                 fontFamily: 'Arial, sans-serif',
-                color: '#aaaaaa',
+                color: '#886633',
                 wordWrap: { width: 190 }
             });
 
@@ -95,8 +87,8 @@ export class Shop extends Phaser.Scene {
 
             const btnLabel = maxed ? 'MAX' : `Kup (${cost} monet)`;
             const canAfford = !maxed && this.coins >= cost;
-            const btnColor = maxed ? '#888888' : (canAfford ? '#ffffff' : '#888888');
-            const btnBg = maxed ? '#444444' : (canAfford ? '#336633' : '#553333');
+            const btnColor = maxed ? '#886633' : (canAfford ? '#ffffff' : '#553300');
+            const btnBg = maxed ? '#ddccaa' : (canAfford ? '#336633' : '#ddbbaa');
 
             const btn = this.add.text(width / 2 + 278, rowY, btnLabel, {
                 fontSize: '17px',
@@ -118,7 +110,7 @@ export class Shop extends Phaser.Scene {
             const lvlText = this.add.text(width / 2 + 104, rowY, `${level}/${upgrade.maxLevel}`, {
                 fontSize: '15px',
                 fontFamily: 'Arial, sans-serif',
-                color: '#aaaaaa'
+                color: '#886633'
             }).setOrigin(1, 0.5);
 
             this.upgradeTexts.push(btn);
@@ -126,14 +118,9 @@ export class Shop extends Phaser.Scene {
         });
 
         // Back button row: [⌫ badge] [← Wróć do gry]
-        this.add.text(width / 2 - 118, height / 2 + 245, '⌫', {
-            fontSize: '15px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#ddddff',
-            backgroundColor: '#3a3a6a',
-            padding: { x: 7, y: 12 },
-            stroke: '#6666aa',
-            strokeThickness: 2
+        this.add.image(width / 2 - 118, height / 2 + 245, 'key_empty').setDisplaySize(28, 26);
+        this.add.text(width / 2 - 118, height / 2 + 245, 'Esc', {
+            fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
         }).setOrigin(0.5);
 
         // Back button
@@ -153,7 +140,7 @@ export class Shop extends Phaser.Scene {
 
         // Keyboard shortcuts: 1-6 buy upgrade, Backspace/Escape closes shop
         this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
-            if (event.key === 'Backspace' || event.key === 'Escape') {
+            if (event.key === 'Escape') {
                 this.closeShop();
             } else {
                 const index = parseInt(event.key) - 1;
@@ -175,7 +162,7 @@ export class Shop extends Phaser.Scene {
         this.upgradeLevels[upgradeId] = level + 1;
         this.registry.set('upgradeLevels', { ...this.upgradeLevels });
 
-        this.coinsText.setText(`Twoje monety: ${this.coins}`);
+        this.coinsText.setText(`💵 ${this.coins}`);
         this.refreshButtons();
     }
 
@@ -193,7 +180,7 @@ export class Shop extends Phaser.Scene {
             btn.disableInteractive();
 
             if (maxed) {
-                btn.setStyle({ color: '#888888', backgroundColor: '#444444' });
+                btn.setStyle({ color: '#886633', backgroundColor: '#ddccaa' });
             } else if (canAfford) {
                 btn.setStyle({ color: '#ffffff', backgroundColor: '#336633' });
                 btn.setInteractive({ useHandCursor: true });
@@ -201,7 +188,7 @@ export class Shop extends Phaser.Scene {
                 btn.on('pointerout', () => btn.setStyle({ backgroundColor: '#336633' }));
                 btn.on('pointerdown', () => this.buyUpgrade(upgrade.id, i));
             } else {
-                btn.setStyle({ color: '#888888', backgroundColor: '#553333' });
+                btn.setStyle({ color: '#553300', backgroundColor: '#ddbbaa' });
             }
         });
     }

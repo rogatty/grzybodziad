@@ -13,17 +13,13 @@ export class Resource extends Phaser.Physics.Arcade.Sprite {
         this.points = RESOURCE_POINTS[type];
 
         scene.add.existing(this);
+        this.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
-        // Spawn animation: scale from 0 to 1
+        // Spawn animation
         this.setScale(0);
-        scene.tweens.add({
-            targets: this,
-            scale: 1,
-            duration: 300,
-            ease: 'Back.out'
-        });
+        scene.tweens.add({ targets: this, scale: 1, duration: 300, ease: 'Back.out' });
 
-        // Gentle floating animation
+        // Floating animation
         scene.tweens.add({
             targets: this,
             y: y - 6,
@@ -35,7 +31,6 @@ export class Resource extends Phaser.Physics.Arcade.Sprite {
     }
 
     collect(): void {
-        // Pop animation before destroying
         this.scene.tweens.add({
             targets: this,
             scale: 1.5,
