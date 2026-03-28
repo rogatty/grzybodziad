@@ -43,7 +43,7 @@ export class GameOver extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Play again button
-        const playBtn = this.add.text(width / 2 - 100, height / 2 + 100, '▶  Jeszcze raz', {
+        const playBtn = this.add.text(width / 2, height / 2 + 100, '▶  Jeszcze raz', {
             fontSize: '28px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffffff',
@@ -57,24 +57,6 @@ export class GameOver extends Phaser.Scene {
         playBtn.on('pointerout', () => playBtn.setStyle({ backgroundColor: '#227722' }));
         playBtn.on('pointerdown', () => {
             this.scene.start('GameScene');
-        });
-
-        // Main menu button
-        const menuBtn = this.add.text(width / 2 + 110, height / 2 + 100, '🏠  Menu', {
-            fontSize: '28px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffffff',
-            backgroundColor: '#225588',
-            padding: { x: 20, y: 12 }
-        })
-            .setOrigin(0.5)
-            .setInteractive({ useHandCursor: true });
-
-        menuBtn.on('pointerover', () => menuBtn.setStyle({ backgroundColor: '#3377bb' }));
-        menuBtn.on('pointerout', () => menuBtn.setStyle({ backgroundColor: '#225588' }));
-        menuBtn.on('pointerdown', () => {
-            this.registry.remove('upgradeLevels');
-            this.scene.start('MainMenu');
         });
     }
 }

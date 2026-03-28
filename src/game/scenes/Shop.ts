@@ -85,7 +85,7 @@ export class Shop extends Phaser.Scene {
             const cost = upgradeCost(upgrade, level);
             const maxed = level >= upgrade.maxLevel;
 
-            const btnLabel = maxed ? 'MAX' : `Kup (${cost} monet)`;
+            const btnLabel = maxed ? 'MAX' : `${cost} 💵`;
             const canAfford = !maxed && this.coins >= cost;
             const btnColor = maxed ? '#886633' : (canAfford ? '#ffffff' : '#553300');
             const btnBg = maxed ? '#ddccaa' : (canAfford ? '#336633' : '#ddbbaa');
@@ -117,26 +117,20 @@ export class Shop extends Phaser.Scene {
             this.upgradeLevelTexts.push(lvlText);
         });
 
-        // Back button row: [⌫ badge] [← Wróć do gry]
-        this.add.image(width / 2 - 118, height / 2 + 245, 'key_empty').setDisplaySize(28, 26);
-        this.add.text(width / 2 - 118, height / 2 + 245, 'Esc', {
+        // Back button
+        const BTN_W = 360, BTN_H = 52;
+        const backBg = this.add.rectangle(width / 2, height / 2 + 245, BTN_W, BTN_H, 0x883300)
+            .setInteractive({ useHandCursor: true });
+        this.add.image(width / 2 - BTN_W / 2 + 55, height / 2 + 245, 'key_empty').setDisplaySize(28, 26);
+        this.add.text(width / 2 - BTN_W / 2 + 55, height / 2 + 245, 'Esc', {
             fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
         }).setOrigin(0.5);
-
-        // Back button
-        const backBtn = this.add.text(width / 2 + 20, height / 2 + 245, '← Wróć do gry', {
-            fontSize: '22px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffffff',
-            backgroundColor: '#883300',
-            padding: { x: 22, y: 12 }
-        })
-            .setOrigin(0.5)
-            .setInteractive({ useHandCursor: true });
-
-        backBtn.on('pointerover', () => backBtn.setStyle({ backgroundColor: '#bb5500' }));
-        backBtn.on('pointerout', () => backBtn.setStyle({ backgroundColor: '#883300' }));
-        backBtn.on('pointerdown', () => this.closeShop());
+        this.add.text(width / 2 + 15, height / 2 + 245, 'Wyjdź', {
+            fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
+        }).setOrigin(0.5);
+        backBg.on('pointerover', () => backBg.setFillStyle(0xbb5500));
+        backBg.on('pointerout', () => backBg.setFillStyle(0x883300));
+        backBg.on('pointerdown', () => this.closeShop());
 
         // Keyboard shortcuts: 1-6 buy upgrade, Backspace/Escape closes shop
         this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
@@ -174,7 +168,7 @@ export class Shop extends Phaser.Scene {
             const maxed = level >= upgrade.maxLevel;
             const canAfford = !maxed && this.coins >= cost;
 
-            btn.setText(maxed ? 'MAX' : `Kup (${cost} monet)`);
+            btn.setText(maxed ? 'MAX' : `${cost} 💵`);
             this.upgradeLevelTexts[i].setText(`${level}/${upgrade.maxLevel}`);
             btn.off('pointerover').off('pointerout').off('pointerdown');
             btn.disableInteractive();

@@ -17,7 +17,7 @@ import {
     TRASH_SPAWN_INTERVAL,
     MAX_TRASH_ON_SCREEN
 } from '../data/constants';
-import { UPGRADES } from '../data/upgrades';
+import { UPGRADES, upgradeCost } from '../data/upgrades';
 import { COSTUMES, DEFAULT_COSTUME_ID } from '../data/costumes';
 
 export class GameScene extends Phaser.Scene {
@@ -29,7 +29,7 @@ export class GameScene extends Phaser.Scene {
     private timeLeft = ROUND_DURATION;
     private basket: Array<{ points: number; spoilAt: number; resourceType: ResourceType | 'trash'; textureKey?: string }> = [];
     private basketCapacity = BASKET_BASE_CAPACITY;
-    private trashBag = 0;
+    private trashBag: string[] = [];
     private trashBagCapacity = 0;
 
     private scoreText!: Phaser.GameObjects.Text;
@@ -38,8 +38,11 @@ export class GameScene extends Phaser.Scene {
     private coinsText!: Phaser.GameObjects.Text;
     private trashBagText!: Phaser.GameObjects.Text;
     private freshnessGraphics!: Phaser.GameObjects.Graphics;
+    private basketSlotImages: Phaser.GameObjects.Image[] = [];
+    private trashSlotImages: Phaser.GameObjects.Image[] = [];
 
     private lastBasketFullWarning = 0;
+    private lastTrashBagFullWarning = 0;
 
     private hut!: Phaser.GameObjects.Image;
     private hutEntered = false;
@@ -81,7 +84,7 @@ export class GameScene extends Phaser.Scene {
         this.hutOnCooldown = false;
         this.coins = 0;
         this.zoomStage = 0;
-        this.trashBag = 0;
+        this.trashBag = [];
         this.trashes = [];
         this.trashBins = [];
         this.binEntered = false;
@@ -147,15 +150,15 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setOrigin(1, 0).setDepth(20);
 
-        this.basketText = this.add.text(16, 50, `🧺 0/${this.basketCapacity}`, {
-            fontSize: '20px',
+        this.basketText = this.add.text(12, 575, '🧺', {
+            fontSize: '26px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffcc44',
             stroke: '#000000',
             strokeThickness: 4
-        }).setDepth(20);
+        }).setOrigin(0, 0.5).setDepth(22);
 
-        this.coinsText = this.add.text(16, 80, '💵 0', {
+        this.coinsText = this.add.text(16, 50, '💵 0', {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffdd44',
@@ -163,16 +166,35 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setDepth(20);
 
-        this.trashBagText = this.add.text(16, 122, '', {
-            fontSize: '18px',
+        this.trashBagText = this.add.text(12, 530, '🗑', {
+            fontSize: '26px',
             fontFamily: 'Arial, sans-serif',
             color: '#88cc88',
             stroke: '#000000',
             strokeThickness: 4
-        }).setDepth(20).setVisible(false);
+        }).setOrigin(0, 0.5).setDepth(22).setVisible(false);
 
         this.freshnessGraphics = this.add.graphics().setDepth(20);
 
+        // Pre-allocate basket slot images (max capacity = 5 + 4*3 = 17)
+        this.basketSlotImages = [];
+        for (let i = 0; i < 17; i++) {
+            const img = this.add.image(80 + i * 44, 575, 'mushroom1')
+                .setDisplaySize(36, 36)
+                .setDepth(21)
+                .setVisible(false);
+            this.basketSlotImages.push(img);
+        }
+
+        // Pre-allocate trash bag slot images (max capacity = 4*3 = 12)
+        this.trashSlotImages = [];
+        for (let i = 0; i < 12; i++) {
+            const img = this.add.image(80 + i * 44, 530, 'trash_banana')
+                .setDisplaySize(36, 36)
+                .setDepth(21)
+                .setVisible(false);
+            this.trashSlotImages.push(img);
+        }
 
         // Hut (shop entrance) — near player start, same relative offset as before
         this.hut = this.add.image(WORLD_WIDTH / 2 + 180, WORLD_HEIGHT / 2 - 120, 'hut').setDepth(5);
@@ -192,13 +214,26 @@ export class GameScene extends Phaser.Scene {
         this.events.on('resume', (sys: Phaser.Scenes.Systems, data: {
             coins?: number; costume?: string;
             basket?: BasketItem[]; score?: number; fromSkup?: boolean;
+            trashBag?: string[]; fromTrashBin?: boolean;
         }) => {
             if (data?.coins !== undefined) {
                 this.coins = data.coins;
                 this.coinsText.setText(`💵 ${this.coins}`);
             }
 
-            if (data?.fromSkup) {
+            if (data?.fromTrashBin) {
+                // Returned from trash bin screen
+                this.trashBag = data.trashBag ?? [];
+                if (data.basket !== undefined) {
+                    this.basket = data.basket;
+                    this.updateBasketUI();
+                }
+                this.updateTrashBagUI();
+                // Tint bin briefly so player has to leave before re-entering
+                const nearBin = this.trashBins.find(bin =>
+                    Phaser.Math.Distance.Between(this.player.x, this.player.y, bin.x, bin.y) < 55
+                );
+            } else if (data?.fromSkup) {
                 // Returned from skup — update basket and score
                 if (data.basket !== undefined) {
                     this.basket = data.basket;
@@ -210,21 +245,11 @@ export class GameScene extends Phaser.Scene {
                 }
                 this.skupHutEntered = true;
                 this.skupHutOnCooldown = true;
-                this.skupHut.setTint(0x888888);
-                this.time.delayedCall(3000, () => {
-                    this.skupHutOnCooldown = false;
-                    this.skupHut.clearTint();
-                });
             } else if (data?.costume !== undefined) {
                 // Returned from costume shop
                 this.player.setCostume(data.costume);
                 this.costumeHutEntered = true;
                 this.costumeHutOnCooldown = true;
-                this.costumeHut.setTint(0x888888);
-                this.time.delayedCall(3000, () => {
-                    this.costumeHutOnCooldown = false;
-                    this.costumeHut.clearTint();
-                });
             } else {
                 // Returned from main shop — re-apply upgrades
                 const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
@@ -236,16 +261,22 @@ export class GameScene extends Phaser.Scene {
                 this.player.collectionRadius = 40 + UPGRADES[1].effect(radiusLevel);
                 this.basketCapacity = BASKET_BASE_CAPACITY + UPGRADES[3].effect(basketLevel);
                 this.trashBagCapacity = UPGRADES[4].effect(trashbagLevel);
+
+                // Move trash from basket into trash bag (up to new capacity)
+                const space = this.trashBagCapacity - this.trashBag.length;
+                if (space > 0) {
+                    const toMove = this.basket.filter(item => item.resourceType === 'trash').slice(0, space);
+                    toMove.forEach(item => this.trashBag.push(item.textureKey ?? 'trash_banana'));
+                    if (toMove.length > 0) {
+                        this.basket = this.basket.filter(item => item.resourceType !== 'trash' || toMove.indexOf(item) === -1);
+                    }
+                }
+
                 this.updateBasketUI();
                 this.updateTrashBagUI();
 
                 this.hutEntered = true;
                 this.hutOnCooldown = true;
-                this.hut.setTint(0x888888);
-                this.time.delayedCall(3000, () => {
-                    this.hutOnCooldown = false;
-                    this.hut.clearTint();
-                });
             }
 
             this.spawnTimer.paused = false;
@@ -265,7 +296,7 @@ export class GameScene extends Phaser.Scene {
         this.fogOverlay = this.add.image(width / 2, height / 2, 'fog_overlay').setDepth(15);
 
         // Main camera ignores all UI elements (text + fog)
-        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay]);
+        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay, ...this.basketSlotImages, ...this.trashSlotImages]);
 
         // UI camera ignores all game world objects (fog stays visible in UI camera)
         this.uiCamera.ignore([this.bgImage, this.player, this.hut, this.costumeHut, this.skupHut]);
@@ -448,13 +479,38 @@ export class GameScene extends Phaser.Scene {
         this.uiCamera.ignore(trash);
     }
 
+    private updateBuildingTints(): void {
+        const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
+        const canEnterShop = !this.hutOnCooldown && UPGRADES.some(u => {
+            const level = upgradeLevels[u.id] ?? 0;
+            return level < u.maxLevel && this.coins >= upgradeCost(u, level);
+        });
+        if (canEnterShop) this.hut.clearTint(); else this.hut.setTint(0x888888);
+
+        const ownedCostumes: string[] = this.registry.get('ownedCostumes') ?? [DEFAULT_COSTUME_ID];
+        const canEnterCostume = !this.costumeHutOnCooldown && (
+            ownedCostumes.length > 1 || COSTUMES.some(c => !ownedCostumes.includes(c.id) && this.coins >= c.cost)
+        );
+        if (canEnterCostume) this.costumeHut.clearTint(); else this.costumeHut.setTint(0x888888);
+
+        const canEnterSkup = !this.skupHutOnCooldown && this.basket.some(i => i.resourceType !== 'trash');
+        if (canEnterSkup) this.skupHut.clearTint(); else this.skupHut.setTint(0x888888);
+
+        const hasTrash = this.trashBag.length > 0 || this.basket.some(i => i.resourceType === 'trash');
+        this.trashBins.forEach(bin => hasTrash ? bin.clearTint() : bin.setTint(0x888888));
+    }
+
     private updateTrashBagUI(): void {
-        if (this.trashBagCapacity <= 0) {
-            this.trashBagText.setVisible(false);
-            return;
+        const hasBag = this.trashBagCapacity > 0;
+        this.trashBagText.setVisible(hasBag);
+        for (let i = 0; i < this.trashSlotImages.length; i++) {
+            const img = this.trashSlotImages[i];
+            if (hasBag && i < this.trashBag.length) {
+                img.setTexture(this.trashBag[i]).setVisible(true);
+            } else {
+                img.setVisible(false);
+            }
         }
-        this.trashBagText.setText(`🗑 Worek: ${this.trashBag}/${this.trashBagCapacity}`);
-        this.trashBagText.setVisible(true);
     }
 
     private tickTimer(): void {
@@ -512,7 +568,7 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
-    private flyToBasket(textureKey: string, worldX: number, worldY: number): void {
+    private flyToUI(textureKey: string, worldX: number, worldY: number, targetX: number, targetY: number): void {
         const cam = this.cameras.main;
         const screenX = (worldX - cam.worldView.x) * cam.zoom;
         const screenY = (worldY - cam.worldView.y) * cam.zoom;
@@ -525,8 +581,8 @@ export class GameScene extends Phaser.Scene {
 
         this.tweens.add({
             targets: img,
-            x: 30,
-            y: 111,
+            x: targetX,
+            y: targetY,
             displayWidth: 10,
             displayHeight: 10,
             alpha: 0.7,
@@ -534,6 +590,16 @@ export class GameScene extends Phaser.Scene {
             ease: 'Quad.in',
             onComplete: () => img.destroy()
         });
+    }
+
+    private flyToBasket(textureKey: string, worldX: number, worldY: number): void {
+        const slot = Math.min(this.basket.length - 1, 16);
+        this.flyToUI(textureKey, worldX, worldY, 80 + slot * 44, 575);
+    }
+
+    private flyToTrashBag(textureKey: string, worldX: number, worldY: number): void {
+        const slot = Math.min(this.trashBag.length - 1, 11);
+        this.flyToUI(textureKey, worldX, worldY, 80 + slot * 44, 530);
     }
 
     private endRound(): void {
@@ -546,39 +612,101 @@ export class GameScene extends Phaser.Scene {
         this.scene.start('GameOver', { score: this.score });
     }
 
+    private playDisintegration(x: number, y: number, textureKey: string): void {
+        const tmp = this.add.image(x, y, textureKey).setDisplaySize(36, 36).setDepth(22);
+        this.cameras.main.ignore(tmp);
+        this.tweens.add({
+            targets: tmp,
+            scaleX: 0, scaleY: 0,
+            angle: 180,
+            alpha: 0,
+            duration: 400,
+            ease: 'Quad.in',
+            onComplete: () => tmp.destroy()
+        });
+    }
+
+    private updateBasketBounce(): void {
+        const now = this.time.now;
+        const BOUNCE_START = 6000;
+        const BASE_Y = 575;
+        for (let i = 0; i < this.basketSlotImages.length; i++) {
+            const img = this.basketSlotImages[i];
+            if (!img.visible || i >= this.basket.length) { img.y = BASE_Y; continue; }
+            const item = this.basket[i];
+            if (item.spoilAt === Infinity) { img.y = BASE_Y; continue; }
+            const remaining = item.spoilAt - now;
+            if (remaining > 0 && remaining < BOUNCE_START) {
+                const progress = 1 - remaining / BOUNCE_START;
+                const frequency = 3 + progress * 9;
+                img.y = BASE_Y + Math.sin(now * frequency * 0.001 * Math.PI * 2) * 5;
+            } else {
+                img.y = BASE_Y;
+            }
+        }
+    }
+
     private updateBasketUI(): void {
-        const count = this.basket.length;
-        const full = count >= this.basketCapacity;
-        this.basketText.setText(`🧺 ${count}/${this.basketCapacity}`);
+        for (let i = 0; i < this.basketSlotImages.length; i++) {
+            const img = this.basketSlotImages[i];
+            if (i < this.basket.length) {
+                img.setTexture(this.basket[i].textureKey ?? 'mushroom1').setVisible(true);
+            } else {
+                img.setVisible(false);
+            }
+        }
+        const full = this.basket.length >= this.basketCapacity;
         this.basketText.setColor(full ? '#ff4444' : '#ffcc44');
     }
 
     private drawFreshnessBars(now: number): void {
         this.freshnessGraphics.clear();
-        const barW = 24;
-        const barH = 10;
-        const gap = 3;
-        const startX = 16;
-        const startY = 106;
 
+        const slotSize = 36;
+        const slotStep = 44;
+        const slotsStartX = 80;
+        const basketY = 575;
+        const trashY = 530;
+        const hasBag = this.trashBagCapacity > 0;
+        const panelTop = hasBag ? 506 : 551;
+
+        // Panel background
+        this.freshnessGraphics.fillStyle(0x000000, 0.45);
+        this.freshnessGraphics.fillRect(0, panelTop, this.scale.width, 600 - panelTop);
+
+        // Basket slots
         for (let i = 0; i < this.basketCapacity; i++) {
-            const x = startX + i * (barW + gap);
-            // Background slot
-            this.freshnessGraphics.fillStyle(0x333333, 0.7);
-            this.freshnessGraphics.fillRect(x, startY, barW, barH);
+            const x = slotsStartX + i * slotStep - slotSize / 2;
+            const y = basketY - slotSize / 2;
+            this.freshnessGraphics.fillStyle(0x444444, 0.7);
+            this.freshnessGraphics.fillRect(x, y, slotSize, slotSize);
+
+            // Spoil bar background
+            const barY = basketY + slotSize / 2 + 2;
+            this.freshnessGraphics.fillStyle(0x222222, 0.9);
+            this.freshnessGraphics.fillRect(x, barY, slotSize, 4);
 
             if (i < this.basket.length) {
                 if (this.basket[i].resourceType === 'trash') {
-                    // Trash: solid brown, full width
                     this.freshnessGraphics.fillStyle(0x886633, 1);
-                    this.freshnessGraphics.fillRect(x, startY, barW, barH);
+                    this.freshnessGraphics.fillRect(x, barY, slotSize, 4);
                 } else {
-                    const remaining = (this.basket[i].spoilAt - now) / BASKET_SPOIL_TIME;
-                    const fill = Math.max(0, Math.min(1, remaining));
+                    const rem = (this.basket[i].spoilAt - now) / BASKET_SPOIL_TIME;
+                    const fill = Math.max(0, Math.min(1, rem));
                     const color = fill > 0.5 ? 0x44dd44 : fill > 0.25 ? 0xffdd00 : 0xff4444;
                     this.freshnessGraphics.fillStyle(color, 1);
-                    this.freshnessGraphics.fillRect(x, startY, Math.round(barW * fill), barH);
+                    this.freshnessGraphics.fillRect(x, barY, Math.round(slotSize * fill), 4);
                 }
+            }
+        }
+
+        // Trash bag row
+        if (hasBag) {
+            for (let i = 0; i < this.trashBagCapacity; i++) {
+                const x = slotsStartX + i * slotStep - slotSize / 2;
+                const y = trashY - slotSize / 2;
+                this.freshnessGraphics.fillStyle(i < this.trashBag.length ? 0x886633 : 0x444444, 0.7);
+                this.freshnessGraphics.fillRect(x, y, slotSize, slotSize);
             }
         }
     }
@@ -627,15 +755,23 @@ export class GameScene extends Phaser.Scene {
         if (hutDist < 55) {
             if (!this.hutEntered && !this.hutOnCooldown) {
                 this.hutEntered = true;
-                this.spawnTimer.paused = true;
-                this.roundTimer.paused = true;
-                this.trashSpawnTimer.paused = true;
-                this.scene.pause('GameScene');
-                this.scene.launch('Shop', { coins: this.coins });
-                this.scene.bringToTop('Shop');
+                const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
+                const canAffordAny = UPGRADES.some(u => {
+                    const level = upgradeLevels[u.id] ?? 0;
+                    return level < u.maxLevel && this.coins >= upgradeCost(u, level);
+                });
+                if (canAffordAny) {
+                    this.spawnTimer.paused = true;
+                    this.roundTimer.paused = true;
+                    this.trashSpawnTimer.paused = true;
+                    this.scene.pause('GameScene');
+                    this.scene.launch('Shop', { coins: this.coins });
+                    this.scene.bringToTop('Shop');
+                }
             }
         } else {
             this.hutEntered = false;
+            if (hutDist > 110) this.hutOnCooldown = false;
         }
 
         // Check if player enters the costume shop
@@ -643,15 +779,21 @@ export class GameScene extends Phaser.Scene {
         if (costumeDist < 55) {
             if (!this.costumeHutEntered && !this.costumeHutOnCooldown) {
                 this.costumeHutEntered = true;
-                this.spawnTimer.paused = true;
-                this.roundTimer.paused = true;
-                this.trashSpawnTimer.paused = true;
-                this.scene.pause('GameScene');
-                this.scene.launch('CostumeShop', { coins: this.coins });
-                this.scene.bringToTop('CostumeShop');
+                const ownedCostumes: string[] = this.registry.get('ownedCostumes') ?? [DEFAULT_COSTUME_ID];
+                const hasMultiple = ownedCostumes.length > 1;
+                const canAffordNew = COSTUMES.some(c => !ownedCostumes.includes(c.id) && this.coins >= c.cost);
+                if (hasMultiple || canAffordNew) {
+                    this.spawnTimer.paused = true;
+                    this.roundTimer.paused = true;
+                    this.trashSpawnTimer.paused = true;
+                    this.scene.pause('GameScene');
+                    this.scene.launch('CostumeShop', { coins: this.coins });
+                    this.scene.bringToTop('CostumeShop');
+                }
             }
         } else {
             this.costumeHutEntered = false;
+            if (costumeDist > 110) this.costumeHutOnCooldown = false;
         }
 
         // Check if player enters the skup (resource market)
@@ -659,43 +801,33 @@ export class GameScene extends Phaser.Scene {
         if (skupDist < 55) {
             if (!this.skupHutEntered && !this.skupHutOnCooldown) {
                 this.skupHutEntered = true;
-                this.spawnTimer.paused = true;
-                this.roundTimer.paused = true;
-                this.trashSpawnTimer.paused = true;
-                this.scene.pause('GameScene');
-                this.scene.launch('Skup', { basket: this.basket, coins: this.coins, score: this.score });
-                this.scene.bringToTop('Skup');
+                const hasSellable = this.basket.some(item => item.resourceType !== 'trash');
+                if (hasSellable) {
+                    this.spawnTimer.paused = true;
+                    this.roundTimer.paused = true;
+                    this.trashSpawnTimer.paused = true;
+                    this.scene.pause('GameScene');
+                    this.scene.launch('Skup', { basket: this.basket, coins: this.coins, score: this.score });
+                    this.scene.bringToTop('Skup');
+                }
             }
         } else {
             this.skupHutEntered = false;
+            if (skupDist > 110) this.skupHutOnCooldown = false;
         }
 
         // Check if player reaches any trash bin
-        const nearBin = this.trashBins.some(bin =>
+        const nearBinObj = this.trashBins.find(bin =>
             Phaser.Math.Distance.Between(this.player.x, this.player.y, bin.x, bin.y) < 55
         );
-        if (nearBin) {
+        if (nearBinObj) {
             if (!this.binEntered) {
                 this.binEntered = true;
-                const trashInBasket = this.basket.filter(item => item.resourceType === 'trash').length;
-                const totalTrash = this.trashBag + trashInBasket;
-                if (totalTrash > 0) {
-                    const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
-                    const recyclingLevel = upgradeLevels['recycling'] ?? 0;
-                    const coinsPerTrash = UPGRADES[5].effect(recyclingLevel);
-                    const earned = totalTrash * coinsPerTrash;
-                    this.trashBag = 0;
-                    this.basket = this.basket.filter(item => item.resourceType !== 'trash');
-                    this.updateBasketUI();
-                    this.updateTrashBagUI();
-                    if (earned > 0) {
-                        this.coins += earned;
-                        this.coinsText.setText(`💵 ${this.coins}`);
-                        this.showCollectText(`♻️ +${earned} monet!`);
-                    } else {
-                        this.showCollectText('♻️ Śmieci wyrzucone!');
-                    }
-                }
+                const hasAnyTrash = this.trashBag.length > 0 || this.basket.some(i => i.resourceType === 'trash');
+                if (!hasAnyTrash) return;
+                this.scene.pause('GameScene');
+                this.scene.launch('TrashBin', { trashBag: this.trashBag, basket: this.basket, coins: this.coins });
+                this.scene.bringToTop('TrashBin');
             }
         } else {
             this.binEntered = false;
@@ -703,11 +835,15 @@ export class GameScene extends Phaser.Scene {
 
         // Spoil check — remove expired basket items
         const now = this.time.now;
-        const beforeSpoil = this.basket.length;
-        this.basket = this.basket.filter(item => item.spoilAt > now);
-        if (this.basket.length < beforeSpoil) {
+        const expired = this.basket.filter(item => item.spoilAt <= now);
+        if (expired.length > 0) {
+            expired.forEach(item => {
+                const i = this.basket.indexOf(item);
+                const img = this.basketSlotImages[i];
+                if (img?.visible) this.playDisintegration(80 + i * 44, 575, img.texture.key);
+            });
+            this.basket = this.basket.filter(item => item.spoilAt > now);
             this.updateBasketUI();
-            this.showCollectText('🍂 Zepsuło się!');
         }
 
         // Check collection by distance
@@ -743,16 +879,34 @@ export class GameScene extends Phaser.Scene {
             if (!trash.active) return;
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, trash.x, trash.y);
             if (dist <= r) {
-                if (this.trashBagCapacity > 0 && this.trashBag < this.trashBagCapacity) {
-                    this.trashBag++;
+                if (this.trashBagCapacity > 0 && this.trashBag.length < this.trashBagCapacity) {
+                    this.trashBag.push(trash.texture.key);
                     this.updateTrashBagUI();
-                    this.showCollectText('🗑 Śmieć w worku!');
+                    this.flyToTrashBag(trash.texture.key, trash.x, trash.y);
                 } else if (this.basket.length < this.basketCapacity) {
                     this.basket.push({ points: 0, spoilAt: Infinity, resourceType: 'trash', textureKey: trash.texture.key });
                     this.updateBasketUI();
-                    this.showCollectText('🗑 Śmieć w koszyku!');
+                    this.flyToBasket(trash.texture.key, trash.x, trash.y);
                 } else {
-                    return; // basket and bag full — skip
+                    // Both full — shake both icons
+                    if (this.time.now - this.lastTrashBagFullWarning > 2000) {
+                        this.lastTrashBagFullWarning = this.time.now;
+                        const shakeIcon = (target: Phaser.GameObjects.Text) => {
+                            const origX = target.x;
+                            this.tweens.add({
+                                targets: target,
+                                x: origX + 10,
+                                duration: 55,
+                                yoyo: true,
+                                repeat: 3,
+                                ease: 'Sine.inOut',
+                                onComplete: () => target.setX(origX)
+                            });
+                        };
+                        if (this.trashBagCapacity > 0) shakeIcon(this.trashBagText);
+                        shakeIcon(this.basketText);
+                    }
+                    return;
                 }
                 trash.collect();
                 collectedTrash.push(trash);
@@ -768,7 +922,19 @@ export class GameScene extends Phaser.Scene {
 
         if (nearResourceWhileFull && this.time.now - this.lastBasketFullWarning > 2000) {
             this.lastBasketFullWarning = this.time.now;
-            this.showCollectText('🧺 Koszyk pełny!\nIdź do chatki!');
+            const origX = this.basketText.x;
+            this.tweens.add({
+                targets: this.basketText,
+                x: origX + 10,
+                duration: 55,
+                yoyo: true,
+                repeat: 3,
+                ease: 'Sine.inOut',
+                onComplete: () => this.basketText.setX(origX)
+            });
         }
+
+        this.updateBasketBounce();
+        this.updateBuildingTints();
     }
 }

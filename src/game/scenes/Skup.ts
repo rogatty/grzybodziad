@@ -19,7 +19,8 @@ export class Skup extends Phaser.Scene {
     private coinsText!: Phaser.GameObjects.Text;
     private basketGrid!: Phaser.GameObjects.Container;
     private basketGridBaseX = 0;
-    private sellBtn!: Phaser.GameObjects.Text;
+    private sellBg!: Phaser.GameObjects.Rectangle;
+    private sellLabel!: Phaser.GameObjects.Text;
 
     constructor() {
         super('Skup');
@@ -72,45 +73,30 @@ export class Skup extends Phaser.Scene {
         this.basketGridBaseX = cx;
         this.refreshGrid();
 
-        // Sell button
-        this.sellBtn = this.add.text(cx, height / 2 + 115, '', {
-            fontSize: '26px',
-            fontFamily: 'Arial Black, sans-serif',
-            color: '#ffffff',
-            backgroundColor: '#336633',
-            padding: { x: 28, y: 14 },
-            align: 'center'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        // Buttons
+        const BTN_W = 360, BTN_H = 52;
+        const sellY = height / 2 + 115;
+        const backY = height / 2 + 180;
 
-        this.sellBtn.on('pointerover', () => {
-            if (this.basket.length > 0) this.sellBtn.setStyle({ backgroundColor: '#44aa44' });
-        });
-        this.sellBtn.on('pointerout', () => {
-            if (this.basket.length > 0) this.sellBtn.setStyle({ backgroundColor: '#336633' });
-        });
-        this.sellBtn.on('pointerdown', () => this.sell());
+        this.sellBg = this.add.rectangle(cx, sellY, BTN_W, BTN_H, 0x336633);
+        this.add.image(cx - BTN_W / 2 + 55, sellY, 'key_space').setDisplaySize(52, 22);
+        this.sellLabel = this.add.text(cx + 15, sellY, '', {
+            fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
+        }).setOrigin(0.5);
         this.refreshSellButton();
 
-        // Space key hint below sell button
-        this.add.image(cx, height / 2 + 158, 'key_space').setDisplaySize(100, 24);
-
-        // Back button
-        const backBtn = this.add.text(cx + 30, height / 2 + 220, '← Wróć do gry', {
-            fontSize: '20px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffffff',
-            backgroundColor: '#883300',
-            padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-        backBtn.on('pointerover', () => backBtn.setStyle({ backgroundColor: '#bb5500' }));
-        backBtn.on('pointerout', () => backBtn.setStyle({ backgroundColor: '#883300' }));
-        backBtn.on('pointerdown', () => this.close());
-
-        this.add.image(cx - 70, height / 2 + 220, 'key_empty').setDisplaySize(28, 26);
-        this.add.text(cx - 70, height / 2 + 220, 'Esc', {
+        const backBg = this.add.rectangle(cx, backY, BTN_W, BTN_H, 0x883300)
+            .setInteractive({ useHandCursor: true });
+        this.add.image(cx - BTN_W / 2 + 55, backY, 'key_empty').setDisplaySize(28, 26);
+        this.add.text(cx - BTN_W / 2 + 55, backY, 'Esc', {
             fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
         }).setOrigin(0.5);
+        this.add.text(cx + 15, backY, 'Wyjdź', {
+            fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
+        }).setOrigin(0.5);
+        backBg.on('pointerover', () => backBg.setFillStyle(0xbb5500));
+        backBg.on('pointerout', () => backBg.setFillStyle(0x883300));
+        backBg.on('pointerdown', () => this.close());
 
         this.input.keyboard!.on('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Escape') this.close();
@@ -147,7 +133,7 @@ export class Skup extends Phaser.Scene {
             const scale = Math.min(imgSize / img.width, (imgSize - 8) / img.height);
             img.setScale(scale);
 
-            const pts = this.add.text(x, y + size / 2 - 9, isTrash ? '🗑' : `${item.points}pt`, {
+            const pts = this.add.text(x, y + size / 2 - 9, isTrash ? '🗑' : `${item.points}💵`, {
                 fontSize: '11px',
                 fontFamily: 'Arial Black, sans-serif',
                 color: isTrash ? '#aa3300' : (fresh ? '#553300' : '#888888'),
@@ -209,7 +195,7 @@ export class Skup extends Phaser.Scene {
 
         if (earned > 0) {
             const popup = this.add.text(this.scale.width / 2 - 80, this.scale.height / 2 + 60,
-                `+${earned} monet!`, {
+                `+${earned} 💵`, {
                     fontSize: '28px',
                     fontFamily: 'Arial Black, sans-serif',
                     color: '#ffff00',
@@ -232,15 +218,17 @@ export class Skup extends Phaser.Scene {
 
     private refreshSellButton(): void {
         const hasItems = this.basket.length > 0;
-        this.sellBtn.setText(hasItems ? 'Sprzedaj zasób' : 'Koszyk pusty');
-        this.sellBtn.setStyle({
-            backgroundColor: hasItems ? '#336633' : '#444444',
-            color: hasItems ? '#ffffff' : '#888888'
-        });
+        this.sellLabel.setText(hasItems ? '💵 Sprzedaj' : 'Koszyk pusty');
+        this.sellLabel.setStyle({ color: hasItems ? '#ffffff' : '#888888' });
+        this.sellBg.setFillStyle(hasItems ? 0x336633 : 0x444444);
+        this.sellBg.off('pointerover').off('pointerout').off('pointerdown');
         if (hasItems) {
-            this.sellBtn.setInteractive({ useHandCursor: true });
+            this.sellBg.setInteractive({ useHandCursor: true });
+            this.sellBg.on('pointerover', () => this.sellBg.setFillStyle(0x44aa44));
+            this.sellBg.on('pointerout', () => this.sellBg.setFillStyle(0x336633));
+            this.sellBg.on('pointerdown', () => this.sell());
         } else {
-            this.sellBtn.disableInteractive();
+            this.sellBg.disableInteractive();
         }
     }
 

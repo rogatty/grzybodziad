@@ -22,6 +22,12 @@ export const RESOURCE_TEXTURES: Record<ResourceType, string[]> = {
 
 export const TRASH_TEXTURES = ['trash_banana', 'trash_bottle'];
 
+// Base coins per trash type (multiplied by recycling level)
+export const TRASH_BASE_COINS: Record<string, number> = {
+    'trash_banana': 1,
+    'trash_bottle': 2
+};
+
 export const RESOURCE_POINTS: Record<ResourceType, number> = {
     mushroom: 1,
     berry: 2,
