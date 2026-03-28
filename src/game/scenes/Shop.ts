@@ -10,6 +10,7 @@ export class Shop extends Phaser.Scene {
     private upgradeLevels: Record<string, number> = {};
     private coinsText!: Phaser.GameObjects.Text;
     private upgradeTexts: Phaser.GameObjects.Text[] = [];
+    private upgradeLevelTexts: Phaser.GameObjects.Text[] = [];
 
     constructor() {
         super('Shop');
@@ -19,6 +20,7 @@ export class Shop extends Phaser.Scene {
         this.coins = data.coins ?? 0;
         this.upgradeLevels = this.registry.get('upgradeLevels') ?? {};
         this.upgradeTexts = [];
+        this.upgradeLevelTexts = [];
         // Ensure all upgrade ids exist
         for (const u of UPGRADES) {
             if (this.upgradeLevels[u.id] === undefined) {
@@ -34,27 +36,27 @@ export class Shop extends Phaser.Scene {
         this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
 
         // Panel
-        this.add.rectangle(width / 2, height / 2, 520, 500, 0x1a1a3e, 0.95)
+        this.add.rectangle(width / 2, height / 2, 520, 570, 0x1a1a3e, 0.95)
             .setStrokeStyle(3, 0x8888ff);
 
         // Title
-        this.add.text(width / 2, height / 2 - 215, '🛍  Sklep', {
+        this.add.text(width / 2, height / 2 - 250, '🛍  Sklep', {
             fontSize: '36px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#ffffff'
         }).setOrigin(0.5);
 
         // Coins display
-        this.coinsText = this.add.text(width / 2, height / 2 - 165, `Twoje monety: ${this.coins}`, {
+        this.coinsText = this.add.text(width / 2, height / 2 - 210, `Twoje monety: ${this.coins}`, {
             fontSize: '22px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffff88'
         }).setOrigin(0.5);
 
         // Upgrade rows
-        const upgradeIcons = ['upgrade-speed', 'upgrade-radius', 'upgrade-spawns', 'upgrade-basket'];
+        const upgradeIcons = ['upgrade-speed', 'upgrade-radius', 'upgrade-spawns', 'upgrade-basket', 'upgrade-trashbag', 'upgrade-recycling'];
         UPGRADES.forEach((upgrade, i) => {
-            const rowY = height / 2 - 105 + i * 80;
+            const rowY = height / 2 - 160 + i * 65;
 
             // Icon
             this.add.image(width / 2 - 220, rowY, upgradeIcons[i]).setDisplaySize(52, 52);
@@ -65,31 +67,31 @@ export class Shop extends Phaser.Scene {
                 color: '#ffffff'
             });
 
-            this.add.text(width / 2 - 186, rowY + 14, upgrade.descriptionPL, {
-                fontSize: '14px',
+            this.add.text(width / 2 - 186, rowY + 8, upgrade.descriptionPL, {
+                fontSize: '13px',
                 fontFamily: 'Arial, sans-serif',
-                color: '#aaaaaa'
+                color: '#aaaaaa',
+                wordWrap: { width: 220 }
             });
 
             const level = this.upgradeLevels[upgrade.id] ?? 0;
             const cost = upgradeCost(upgrade, level);
             const maxed = level >= upgrade.maxLevel;
 
-            const btnLabel = maxed
-                ? 'MAX'
-                : `Kup  (${cost} pkt)  Poziom: ${level}/${upgrade.maxLevel}`;
-
+            const btnLabel = maxed ? 'MAX' : `Kup (${cost} pkt)`;
             const canAfford = !maxed && this.coins >= cost;
             const btnColor = maxed ? '#888888' : (canAfford ? '#ffffff' : '#888888');
             const btnBg = maxed ? '#444444' : (canAfford ? '#336633' : '#553333');
 
-            const btn = this.add.text(width / 2 + 140, rowY, btnLabel, {
-                fontSize: '18px',
+            const btn = this.add.text(width / 2 + 248, rowY - 8, btnLabel, {
+                fontSize: '17px',
                 fontFamily: 'Arial, sans-serif',
                 color: btnColor,
                 backgroundColor: btnBg,
-                padding: { x: 14, y: 8 }
-            }).setOrigin(0.5);
+                padding: { x: 12, y: 7 },
+                fixedWidth: 130,
+                align: 'center'
+            }).setOrigin(1, 0.5);
 
             if (canAfford) {
                 btn.setInteractive({ useHandCursor: true });
@@ -98,11 +100,18 @@ export class Shop extends Phaser.Scene {
                 btn.on('pointerdown', () => this.buyUpgrade(upgrade.id, i));
             }
 
+            const lvlText = this.add.text(width / 2 + 88, rowY - 8, `${level}/${upgrade.maxLevel}`, {
+                fontSize: '15px',
+                fontFamily: 'Arial, sans-serif',
+                color: '#aaaaaa'
+            }).setOrigin(1, 0.5);
+
             this.upgradeTexts.push(btn);
+            this.upgradeLevelTexts.push(lvlText);
         });
 
         // Back button
-        const backBtn = this.add.text(width / 2, height / 2 + 215, '← Wróć do gry', {
+        const backBtn = this.add.text(width / 2, height / 2 + 255, '← Wróć do gry', {
             fontSize: '24px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffffff',
@@ -115,6 +124,18 @@ export class Shop extends Phaser.Scene {
         backBtn.on('pointerover', () => backBtn.setStyle({ backgroundColor: '#aa4400' }));
         backBtn.on('pointerout', () => backBtn.setStyle({ backgroundColor: '#883300' }));
         backBtn.on('pointerdown', () => this.closeShop());
+
+        // Keyboard shortcuts: 1-6 buy upgrade, Backspace closes shop
+        this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
+            if (event.key === 'Backspace') {
+                this.closeShop();
+            } else {
+                const index = parseInt(event.key) - 1;
+                if (index >= 0 && index < UPGRADES.length) {
+                    this.buyUpgrade(UPGRADES[index].id, index);
+                }
+            }
+        });
     }
 
     private buyUpgrade(upgradeId: string, index: number): void {
@@ -140,7 +161,8 @@ export class Shop extends Phaser.Scene {
             const maxed = level >= upgrade.maxLevel;
             const canAfford = !maxed && this.coins >= cost;
 
-            btn.setText(maxed ? 'MAX' : `Kup  (${cost} pkt)  Poziom: ${level}/${upgrade.maxLevel}`);
+            btn.setText(maxed ? 'MAX' : `Kup (${cost} pkt)`);
+            this.upgradeLevelTexts[i].setText(`${level}/${upgrade.maxLevel}`);
             btn.off('pointerover').off('pointerout').off('pointerdown');
             btn.disableInteractive();
 

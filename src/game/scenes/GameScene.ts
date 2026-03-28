@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Player } from '../objects/Player';
 import { Resource } from '../objects/Resource';
+import { Trash } from '../objects/Trash';
 import {
     RESOURCE_SPAWN_INTERVAL,
     MAX_RESOURCES_ON_SCREEN,
@@ -12,7 +13,9 @@ import {
     RESOURCE_NAMES_PL,
     CAMERA_INITIAL_ZOOM,
     WORLD_WIDTH,
-    WORLD_HEIGHT
+    WORLD_HEIGHT,
+    TRASH_SPAWN_INTERVAL,
+    MAX_TRASH_ON_SCREEN
 } from '../data/constants';
 import { UPGRADES } from '../data/upgrades';
 
@@ -24,20 +27,29 @@ export class GameScene extends Phaser.Scene {
     private score = 0;
     private coins = 0;
     private timeLeft = ROUND_DURATION;
-    private basket: Array<{ points: number; spoilAt: number }> = [];
+    private basket: Array<{ points: number; spoilAt: number; isTrash?: boolean }> = [];
     private basketCapacity = BASKET_BASE_CAPACITY;
+    private trashBag = 0;
+    private trashBagCapacity = 0;
 
     private scoreText!: Phaser.GameObjects.Text;
     private timerText!: Phaser.GameObjects.Text;
-    private collectText!: Phaser.GameObjects.Text;
     private basketText!: Phaser.GameObjects.Text;
     private coinsText!: Phaser.GameObjects.Text;
+    private trashBagText!: Phaser.GameObjects.Text;
     private freshnessGraphics!: Phaser.GameObjects.Graphics;
 
     private lastBasketFullWarning = 0;
 
     private hut!: Phaser.GameObjects.Image;
     private hutEntered = false;
+    private hutOnCooldown = false;
+
+    private trashBins: Phaser.GameObjects.Image[] = [];
+    private binQuadrants: number[] = [];
+    private binEntered = false;
+    private trashes: Trash[] = [];
+    private trashSpawnTimer!: Phaser.Time.TimerEvent;
 
     private spawnTimer!: Phaser.Time.TimerEvent;
     private roundTimer!: Phaser.Time.TimerEvent;
@@ -60,8 +72,15 @@ export class GameScene extends Phaser.Scene {
         this.stoneImages = [];
         this.basket = [];
         this.hutEntered = false;
+        this.hutOnCooldown = false;
         this.coins = 0;
         this.zoomStage = 0;
+        this.trashBag = 0;
+        this.trashes = [];
+        this.trashBins = [];
+        this.binEntered = false;
+        // Shuffle quadrants so each game puts bins in different corners
+        this.binQuadrants = Phaser.Utils.Array.Shuffle([0, 1, 2, 3]);
 
         // Reset upgrades each round
         this.registry.set('upgradeLevels', {});
@@ -73,11 +92,13 @@ export class GameScene extends Phaser.Scene {
         const radiusLevel = upgradeLevels['radius'] ?? 0;
         const spawnsLevel = upgradeLevels['spawns'] ?? 0;
         const basketLevel = upgradeLevels['basket'] ?? 0;
+        const trashbagLevel = upgradeLevels['trashbag'] ?? 0;
 
         this.registry.set('speedBonus', UPGRADES[0].effect(speedLevel));
         this.registry.set('radiusBonus', UPGRADES[1].effect(radiusLevel));
         this.registry.set('maxResourcesBonus', UPGRADES[2].effect(spawnsLevel));
         this.basketCapacity = BASKET_BASE_CAPACITY + UPGRADES[3].effect(basketLevel);
+        this.trashBagCapacity = UPGRADES[4].effect(trashbagLevel);
     }
 
     create(): void {
@@ -155,18 +176,20 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setDepth(20);
 
-        this.freshnessGraphics = this.add.graphics().setDepth(20);
-
-        this.collectText = this.add.text(width / 2, height / 2 - 80, '', {
-            fontSize: '28px',
-            fontFamily: 'Arial Black, sans-serif',
-            color: '#ffff00',
+        this.trashBagText = this.add.text(16, 122, '', {
+            fontSize: '18px',
+            fontFamily: 'Arial, sans-serif',
+            color: '#88cc88',
             stroke: '#000000',
             strokeThickness: 4
-        }).setOrigin(0.5).setDepth(20).setAlpha(0);
+        }).setDepth(20).setVisible(false);
+
+        this.freshnessGraphics = this.add.graphics().setDepth(20);
+
 
         // Hut (shop entrance) — near player start, same relative offset as before
         this.hut = this.add.image(WORLD_WIDTH / 2 + 180, WORLD_HEIGHT / 2 - 120, 'hut').setDepth(5);
+
 
         // Listen for shop closing
         this.events.on('resume', (sys: Phaser.Scenes.Systems, data: { coins?: number }) => {
@@ -176,19 +199,29 @@ export class GameScene extends Phaser.Scene {
             }
             this.spawnTimer.paused = false;
             this.roundTimer.paused = false;
+            this.trashSpawnTimer.paused = false;
 
             // Re-apply upgrades
             const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
             const speedLevel = upgradeLevels['speed'] ?? 0;
             const radiusLevel = upgradeLevels['radius'] ?? 0;
             const basketLevel = upgradeLevels['basket'] ?? 0;
+            const trashbagLevel = upgradeLevels['trashbag'] ?? 0;
             this.player.speed = 200 + UPGRADES[0].effect(speedLevel);
             this.player.collectionRadius = 40 + UPGRADES[1].effect(radiusLevel);
             this.basketCapacity = BASKET_BASE_CAPACITY + UPGRADES[3].effect(basketLevel);
+            this.trashBagCapacity = UPGRADES[4].effect(trashbagLevel);
             this.updateBasketUI();
+            this.updateTrashBagUI();
 
             // Cooldown so player must walk away before re-entering
             this.hutEntered = true;
+            this.hutOnCooldown = true;
+            this.hut.setTint(0x888888);
+            this.time.delayedCall(3000, () => {
+                this.hutOnCooldown = false;
+                this.hut.clearTint();
+            });
         });
 
         // Camera setup: main camera follows player, UI camera fixed
@@ -203,10 +236,13 @@ export class GameScene extends Phaser.Scene {
         this.fogOverlay = this.add.image(width / 2, height / 2, 'fog_overlay').setDepth(15);
 
         // Main camera ignores all UI elements (text + fog)
-        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.freshnessGraphics, this.fogOverlay]);
+        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay]);
 
         // UI camera ignores all game world objects (fog stays visible in UI camera)
-        this.uiCamera.ignore([this.bgImage, ...this.stoneImages, this.player, this.hut, this.collectText]);
+        this.uiCamera.ignore([this.bgImage, ...this.stoneImages, this.player, this.hut]);
+
+        // Add first bin after cameras are set up (so uiCamera.ignore works)
+        this.addTrashBin(0);
 
         // Spawn resources periodically
         this.spawnTimer = this.time.addEvent({
@@ -220,6 +256,14 @@ export class GameScene extends Phaser.Scene {
         this.roundTimer = this.time.addEvent({
             delay: 1000,
             callback: this.tickTimer,
+            callbackScope: this,
+            loop: true
+        });
+
+        // Trash spawn
+        this.trashSpawnTimer = this.time.addEvent({
+            delay: TRASH_SPAWN_INTERVAL,
+            callback: this.spawnTrash,
             callbackScope: this,
             loop: true
         });
@@ -309,6 +353,77 @@ export class GameScene extends Phaser.Scene {
         this.uiCamera.ignore(resource);
     }
 
+    private addTrashBin(stage: number): void {
+        const zone = this.getZoneBounds(stage);
+        const cx = zone.x + zone.w / 2;
+        const cy = zone.y + zone.h / 2;
+
+        // Stay within 55% of zone half-size from center — safely inside fog boundary (fog starts at 80%)
+        // At corner (both axes at 55%): normalized distance = sqrt(0.55²+0.55²) ≈ 0.78 < 0.80 ✓
+        const safeX = zone.w * 0.275; // 55% of half-width
+        const safeY = zone.h * 0.275; // 55% of half-height
+        const innerX = zone.w * 0.10; // keep some distance from center
+        const innerY = zone.h * 0.10;
+
+        // Each quadrant is a corner of the safe area: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
+        const quadrant = this.binQuadrants[stage];
+        const xRange = quadrant % 2 === 0
+            ? { min: cx - safeX, max: cx - innerX }
+            : { min: cx + innerX, max: cx + safeX };
+        const yRange = quadrant < 2
+            ? { min: cy - safeY, max: cy - innerY }
+            : { min: cy + innerY, max: cy + safeY };
+
+        let x = 0, y = 0;
+        let attempts = 0;
+        do {
+            x = Phaser.Math.Between(xRange.min, xRange.max);
+            y = Phaser.Math.Between(yRange.min, yRange.max);
+            attempts++;
+
+            if (Phaser.Math.Distance.Between(x, y, this.hut.x, this.hut.y) < 160) continue;
+            if (Phaser.Math.Distance.Between(x, y, WORLD_WIDTH / 2, WORLD_HEIGHT / 2) < 160) continue;
+            if (this.trashBins.some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 350)) continue;
+
+            break;
+        } while (attempts < 100);
+
+        const bin = this.add.image(x, y, 'trashbin').setDepth(5);
+        this.trashBins.push(bin);
+        this.uiCamera.ignore(bin);
+    }
+
+    private spawnTrash(): void {
+        if (this.trashes.length >= MAX_TRASH_ON_SCREEN) return;
+
+        const margin = 60;
+        const zone = this.getZoneBounds(this.zoomStage);
+        let x = 0, y = 0;
+        let attempts = 0;
+        do {
+            x = Phaser.Math.Between(zone.x + margin, zone.x + zone.w - margin);
+            y = Phaser.Math.Between(zone.y + margin + 40, zone.y + zone.h - margin - 40);
+            attempts++;
+        } while (
+            attempts < 20 &&
+            this.stoneList.some(s => Phaser.Math.Distance.Between(x, y, s.x, s.y) < s.radius + 30)
+        );
+        if (attempts >= 20) return;
+
+        const trash = new Trash(this, x, y);
+        this.trashes.push(trash);
+        this.uiCamera.ignore(trash);
+    }
+
+    private updateTrashBagUI(): void {
+        if (this.trashBagCapacity <= 0) {
+            this.trashBagText.setVisible(false);
+            return;
+        }
+        this.trashBagText.setText(`🗑 Worek: ${this.trashBag}/${this.trashBagCapacity}`);
+        this.trashBagText.setVisible(true);
+    }
+
     private tickTimer(): void {
         this.timeLeft -= 1;
         this.timerText.setText(`Czas: ${this.timeLeft}`);
@@ -336,6 +451,7 @@ export class GameScene extends Phaser.Scene {
             const zone = this.getZoneBounds(this.zoomStage);
             this.physics.world.setBounds(zone.x, zone.y, zone.w, zone.h);
             this.cameras.main.setBounds(zone.x, zone.y, zone.w, zone.h);
+            this.addTrashBin(this.zoomStage);
         }
 
         if (this.timeLeft <= 0) {
@@ -344,19 +460,29 @@ export class GameScene extends Phaser.Scene {
     }
 
     private showCollectText(text: string): void {
-        this.collectText.setText(text).setAlpha(1).setPosition(this.player.x, this.player.y - 60);
+        const offsetX = Phaser.Math.Between(-30, 30);
+        const label = this.add.text(this.player.x + offsetX, this.player.y - 60, text, {
+            fontSize: '26px',
+            fontFamily: 'Arial Black, sans-serif',
+            color: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setDepth(20);
+        this.uiCamera.ignore(label);
         this.tweens.add({
-            targets: this.collectText,
-            y: this.player.y - 100,
+            targets: label,
+            y: label.y - 50,
             alpha: 0,
-            duration: 800,
-            ease: 'Quad.out'
+            duration: 900,
+            ease: 'Quad.out',
+            onComplete: () => label.destroy()
         });
     }
 
     private endRound(): void {
         this.spawnTimer.remove();
         this.roundTimer.remove();
+        this.trashSpawnTimer.remove();
         // Add whatever is still fresh in basket to score
         const remaining = this.basket.filter(item => item.spoilAt > this.time.now);
         this.score += remaining.reduce((sum, item) => sum + item.points, 0);
@@ -385,11 +511,17 @@ export class GameScene extends Phaser.Scene {
             this.freshnessGraphics.fillRect(x, startY, barW, barH);
 
             if (i < this.basket.length) {
-                const remaining = (this.basket[i].spoilAt - now) / BASKET_SPOIL_TIME;
-                const fill = Math.max(0, Math.min(1, remaining));
-                const color = fill > 0.5 ? 0x44dd44 : fill > 0.25 ? 0xffdd00 : 0xff4444;
-                this.freshnessGraphics.fillStyle(color, 1);
-                this.freshnessGraphics.fillRect(x, startY, Math.round(barW * fill), barH);
+                if (this.basket[i].isTrash) {
+                    // Trash: solid brown, full width
+                    this.freshnessGraphics.fillStyle(0x886633, 1);
+                    this.freshnessGraphics.fillRect(x, startY, barW, barH);
+                } else {
+                    const remaining = (this.basket[i].spoilAt - now) / BASKET_SPOIL_TIME;
+                    const fill = Math.max(0, Math.min(1, remaining));
+                    const color = fill > 0.5 ? 0x44dd44 : fill > 0.25 ? 0xffdd00 : 0xff4444;
+                    this.freshnessGraphics.fillStyle(color, 1);
+                    this.freshnessGraphics.fillRect(x, startY, Math.round(barW * fill), barH);
+                }
             }
         }
     }
@@ -436,10 +568,11 @@ export class GameScene extends Phaser.Scene {
         // Check if player enters the hut
         const hutDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.hut.x, this.hut.y);
         if (hutDist < 55) {
-            if (!this.hutEntered) {
+            if (!this.hutEntered && !this.hutOnCooldown) {
                 this.hutEntered = true;
                 this.spawnTimer.paused = true;
                 this.roundTimer.paused = true;
+                this.trashSpawnTimer.paused = true;
                 // Convert basket to points and coins
                 const sold = this.basket.reduce((sum, item) => sum + item.points, 0);
                 this.score += sold;
@@ -454,6 +587,37 @@ export class GameScene extends Phaser.Scene {
             }
         } else {
             this.hutEntered = false;
+        }
+
+        // Check if player reaches any trash bin
+        const nearBin = this.trashBins.some(bin =>
+            Phaser.Math.Distance.Between(this.player.x, this.player.y, bin.x, bin.y) < 55
+        );
+        if (nearBin) {
+            if (!this.binEntered) {
+                this.binEntered = true;
+                const trashInBasket = this.basket.filter(item => item.isTrash).length;
+                const totalTrash = this.trashBag + trashInBasket;
+                if (totalTrash > 0) {
+                    const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
+                    const recyclingLevel = upgradeLevels['recycling'] ?? 0;
+                    const coinsPerTrash = UPGRADES[5].effect(recyclingLevel);
+                    const earned = totalTrash * coinsPerTrash;
+                    this.trashBag = 0;
+                    this.basket = this.basket.filter(item => !item.isTrash);
+                    this.updateBasketUI();
+                    this.updateTrashBagUI();
+                    if (earned > 0) {
+                        this.coins += earned;
+                        this.coinsText.setText(`Monety: ${this.coins}`);
+                        this.showCollectText(`♻️ +${earned} monet!`);
+                    } else {
+                        this.showCollectText('♻️ Śmieci wyrzucone!');
+                    }
+                }
+            }
+        } else {
+            this.binEntered = false;
         }
 
         // Spoil check — remove expired basket items
@@ -490,6 +654,31 @@ export class GameScene extends Phaser.Scene {
         });
         if (collected.length > 0) {
             this.resources = this.resources.filter(r => !collected.includes(r));
+        }
+
+        // Collect trash by proximity
+        const collectedTrash: Trash[] = [];
+        this.trashes.forEach((trash) => {
+            if (!trash.active) return;
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, trash.x, trash.y);
+            if (dist <= r) {
+                if (this.trashBagCapacity > 0 && this.trashBag < this.trashBagCapacity) {
+                    this.trashBag++;
+                    this.updateTrashBagUI();
+                    this.showCollectText('🗑 Śmieć w worku!');
+                } else if (this.basket.length < this.basketCapacity) {
+                    this.basket.push({ points: 0, spoilAt: Infinity, isTrash: true });
+                    this.updateBasketUI();
+                    this.showCollectText('🗑 Śmieć w koszyku!');
+                } else {
+                    return; // basket and bag full — skip
+                }
+                trash.collect();
+                collectedTrash.push(trash);
+            }
+        });
+        if (collectedTrash.length > 0) {
+            this.trashes = this.trashes.filter(t => !collectedTrash.includes(t));
         }
 
         // Draw freshness bars

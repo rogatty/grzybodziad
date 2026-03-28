@@ -18,7 +18,7 @@ export const UPGRADES: Upgrade[] = [
     },
     {
         id: 'radius',
-        namePL: 'Duży koszyk',
+        namePL: 'Długie ręce',
         descriptionPL: 'Zbieraj z większej odległości!',
         baseCost: 4,
         maxLevel: 4,
@@ -39,6 +39,22 @@ export const UPGRADES: Upgrade[] = [
         baseCost: 4,
         maxLevel: 4,
         effect: (level) => level * 3 // +3 capacity per level
+    },
+    {
+        id: 'trashbag',
+        namePL: 'Worek na śmieci',
+        descriptionPL: 'Śmieci nie zajmują miejsca w koszyku!',
+        baseCost: 5,
+        maxLevel: 4,
+        effect: (level) => level * 3 // capacity (0 = no bag)
+    },
+    {
+        id: 'recycling',
+        namePL: 'Recykling',
+        descriptionPL: 'Monety za śmieci przy kubełku!',
+        baseCost: 6,
+        maxLevel: 3,
+        effect: (level) => level // coins per trash item
     }
 ];
 

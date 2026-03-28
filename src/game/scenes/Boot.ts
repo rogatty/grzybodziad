@@ -73,28 +73,26 @@ export class Boot extends Phaser.Scene {
         speedGfx.generateTexture('upgrade-speed', 64, 64);
         speedGfx.destroy();
 
-        // Upgrade icon: radius — basket with mushroom inside
+        // Upgrade icon: radius — long arms reaching for a mushroom
         const radiusGfx = this.make.graphics({ x: 0, y: 0 });
-        // Handle (two thick rectangles forming arch)
-        radiusGfx.fillStyle(0x8b6030);
-        radiusGfx.fillRect(14, 10, 6, 20);
-        radiusGfx.fillRect(44, 10, 6, 20);
-        radiusGfx.fillRect(14, 10, 36, 6);
-        // Basket body
-        radiusGfx.fillStyle(0xc8a060);
-        radiusGfx.fillRoundedRect(8, 28, 48, 30, 6);
-        // Weave stripes (darker)
-        radiusGfx.fillStyle(0x9a7040);
-        radiusGfx.fillRect(8, 38, 48, 4);
-        radiusGfx.fillRect(22, 28, 4, 30);
-        radiusGfx.fillRect(38, 28, 4, 30);
-        // Mushroom inside
+        // Body (torso)
+        radiusGfx.fillStyle(0x44aa44);
+        radiusGfx.fillCircle(32, 18, 9); // head
+        radiusGfx.fillRect(27, 26, 10, 14); // torso
+        // Left arm (long, reaching left)
+        radiusGfx.fillStyle(0x44aa44);
+        radiusGfx.fillRect(4, 28, 24, 6); // arm
+        radiusGfx.fillRect(2, 25, 8, 10); // hand
+        // Right arm (long, reaching right)
+        radiusGfx.fillRect(36, 28, 24, 6); // arm
+        radiusGfx.fillRect(54, 25, 8, 10); // hand
+        // Mushroom on the right (being grabbed)
         radiusGfx.fillStyle(0xdd2222);
-        radiusGfx.fillCircle(32, 26, 10);
+        radiusGfx.fillCircle(56, 18, 8);
         radiusGfx.fillStyle(0xffffff);
-        radiusGfx.fillCircle(28, 24, 3);
+        radiusGfx.fillCircle(52, 16, 2);
         radiusGfx.fillStyle(0xf5deb3);
-        radiusGfx.fillRect(28, 30, 8, 6);
+        radiusGfx.fillRect(52, 22, 6, 6);
         radiusGfx.generateTexture('upgrade-radius', 64, 64);
         radiusGfx.destroy();
 
@@ -160,6 +158,65 @@ export class Boot extends Phaser.Scene {
         basketGfx.fillCircle(44, 44, 4);
         basketGfx.generateTexture('upgrade-basket', 64, 64);
         basketGfx.destroy();
+
+        // Trash: crumpled gray-brown ball
+        const trashGfx = this.make.graphics({ x: 0, y: 0 });
+        trashGfx.fillStyle(0x998866);
+        trashGfx.fillCircle(14, 14, 11);
+        trashGfx.fillStyle(0x776644);
+        trashGfx.fillRect(10, 12, 4, 3);
+        trashGfx.fillRect(16, 10, 3, 5);
+        trashGfx.fillRect(12, 17, 5, 3);
+        trashGfx.generateTexture('trash', 28, 28);
+        trashGfx.destroy();
+
+        // Trash bin: green bin with lid
+        const binGfx = this.make.graphics({ x: 0, y: 0 });
+        // Body
+        binGfx.fillStyle(0x228822);
+        binGfx.fillRect(10, 28, 44, 38);
+        // Lid
+        binGfx.fillStyle(0x116611);
+        binGfx.fillRect(6, 20, 52, 10);
+        // Handle
+        binGfx.fillStyle(0x116611);
+        binGfx.fillRect(26, 12, 12, 10);
+        // Recycling arrows (simplified)
+        binGfx.fillStyle(0xffffff);
+        binGfx.fillTriangle(32, 34, 24, 46, 40, 46);
+        binGfx.generateTexture('trashbin', 64, 68);
+        binGfx.destroy();
+
+        // Upgrade icon: trashbag — bag shape
+        const trashbagGfx = this.make.graphics({ x: 0, y: 0 });
+        // Bag body
+        trashbagGfx.fillStyle(0x44aa44);
+        trashbagGfx.fillRoundedRect(10, 22, 44, 36, 8);
+        // Bag top/tie
+        trashbagGfx.fillStyle(0x228822);
+        trashbagGfx.fillRect(22, 12, 20, 12);
+        trashbagGfx.fillStyle(0x116611);
+        trashbagGfx.fillRect(28, 6, 8, 8);
+        // Trash symbol inside
+        trashbagGfx.fillStyle(0x998866);
+        trashbagGfx.fillCircle(32, 38, 8);
+        trashbagGfx.generateTexture('upgrade-trashbag', 64, 64);
+        trashbagGfx.destroy();
+
+        // Upgrade icon: recycling — arrows in triangle
+        const recyclingGfx = this.make.graphics({ x: 0, y: 0 });
+        recyclingGfx.fillStyle(0x228822);
+        recyclingGfx.fillCircle(32, 32, 28);
+        recyclingGfx.fillStyle(0xffffff);
+        // Three arrows forming recycling symbol (simplified as triangles)
+        recyclingGfx.fillTriangle(32, 10, 20, 30, 44, 30);
+        recyclingGfx.fillStyle(0x228822);
+        recyclingGfx.fillCircle(32, 28, 10);
+        // Coin
+        recyclingGfx.fillStyle(0xffdd00);
+        recyclingGfx.fillCircle(32, 32, 8);
+        recyclingGfx.generateTexture('upgrade-recycling', 64, 64);
+        recyclingGfx.destroy();
 
         // Hut: simple house with roof and door
         const hutGfx = this.make.graphics({ x: 0, y: 0 });
