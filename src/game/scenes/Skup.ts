@@ -9,21 +9,14 @@ interface SkupData {
     score: number;
 }
 
-const SELL_SPEED_COSTS = [15, 25, 40]; // cost to reach level 1, 2, 3
-const SELL_SPEED_ITEMS = [1, 2, 3, 5]; // items sold per click at level 0, 1, 2, 3
-
-
 export class Skup extends Phaser.Scene {
     private basket: BasketItem[] = [];       // only sellable (non-trash)
     private trashBasket: BasketItem[] = [];  // trash — returned untouched on close
     private coins = 0;
     private score = 0;
-    private sellSpeedLevel = 0;
     private coinsText!: Phaser.GameObjects.Text;
     private basketGrid!: Phaser.GameObjects.Container;
-    private infoText!: Phaser.GameObjects.Text;
     private sellBtn!: Phaser.GameObjects.Text;
-    private upgradeBtn!: Phaser.GameObjects.Text;
 
     constructor() {
         super('Skup');
@@ -34,7 +27,6 @@ export class Skup extends Phaser.Scene {
         this.trashBasket = data.basket.filter(i => i.resourceType === 'trash');
         this.coins = data.coins ?? 0;
         this.score = data.score ?? 0;
-        this.sellSpeedLevel = this.registry.get('sellSpeedLevel') ?? 0;
     }
 
     create(): void {
@@ -70,7 +62,7 @@ export class Skup extends Phaser.Scene {
         this.refreshGrid();
 
         // Sell button
-        this.sellBtn = this.add.text(cx, height / 2 + 95, '', {
+        this.sellBtn = this.add.text(cx, height / 2 + 115, '', {
             fontSize: '26px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#ffffff',
@@ -85,39 +77,20 @@ export class Skup extends Phaser.Scene {
         this.sellBtn.on('pointerout', () => {
             if (this.basket.length > 0) this.sellBtn.setStyle({ backgroundColor: '#336633' });
         });
-        this.sellBtn.on('pointerdown', () => this.sellBatch());
+        this.sellBtn.on('pointerdown', () => this.sell());
         this.refreshSellButton();
-
-        // Info text (items sold per click)
-        this.infoText = this.add.text(cx, height / 2 + 148, '', {
-            fontSize: '15px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#aaaaaa'
-        }).setOrigin(0.5);
-        this.refreshInfoText();
 
         // Info about trash in basket (if any)
         if (this.trashBasket.length > 0) {
-            this.add.text(cx, height / 2 + 168, `🗑 ${this.trashBasket.length} śmieci w koszyku — wyrzuć je do kubła`, {
+            this.add.text(cx, height / 2 + 178, `🗑 ${this.trashBasket.length} śmieci w koszyku — wyrzuć je do kubła`, {
                 fontSize: '14px',
                 fontFamily: 'Arial, sans-serif',
                 color: '#aa8866'
             }).setOrigin(0.5);
         }
 
-        // Upgrade button: Szybka sprzedaż
-        this.upgradeBtn = this.add.text(cx, height / 2 + 200, '', {
-            fontSize: '16px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffffff',
-            backgroundColor: '#553300',
-            padding: { x: 14, y: 8 },
-            align: 'center'
-        }).setOrigin(0.5);
-        this.refreshUpgradeButton();
-
         // Back button
-        const backBtn = this.add.text(cx, height / 2 + 248, '← Wróć do gry', {
+        const backBtn = this.add.text(cx, height / 2 + 220, '← Wróć do gry', {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffffff',
@@ -131,13 +104,12 @@ export class Skup extends Phaser.Scene {
 
         this.input.keyboard!.on('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Backspace' || e.key === 'Escape') this.close();
-            if (e.key === ' ' || e.key === 'Enter') this.sellBatch();
+            if (e.key === ' ' || e.key === 'Enter') this.sell();
         });
     }
 
     private refreshGrid(): void {
         this.basketGrid.removeAll(true);
-        const now = Date.now();
         const cols = 8;
         const size = 50;
         const gap = 8;
@@ -181,28 +153,22 @@ export class Skup extends Phaser.Scene {
         }
     }
 
-    private sellBatch(): void {
+    private sell(): void {
         if (this.basket.length === 0) return;
-        const n = SELL_SPEED_ITEMS[this.sellSpeedLevel];
+        const item = this.basket.shift()!;
         const now = this.time.now;
 
         let earned = 0;
-        let sold = 0;
-        for (let i = 0; i < n && this.basket.length > 0; i++) {
-            const item = this.basket.shift()!;
-            if (item.spoilAt > now) {
-                earned += item.points;
-                this.score += item.points;
-            }
-            sold++;
+        if (item.spoilAt > now) {
+            earned = item.points;
+            this.score += earned;
         }
 
         this.coins += earned;
         this.coinsText.setText(`Monety: ${this.coins}`);
 
-        // Coin pop text
         if (earned > 0) {
-            const popup = this.add.text(this.scale.width / 2, this.scale.height / 2 + 60,
+            const popup = this.add.text(this.scale.width / 2 - 80, this.scale.height / 2 + 60,
                 `+${earned} monet!`, {
                     fontSize: '28px',
                     fontFamily: 'Arial Black, sans-serif',
@@ -222,16 +188,11 @@ export class Skup extends Phaser.Scene {
 
         this.refreshGrid();
         this.refreshSellButton();
-        this.refreshUpgradeButton();
     }
 
     private refreshSellButton(): void {
-        const n = SELL_SPEED_ITEMS[this.sellSpeedLevel];
         const hasItems = this.basket.length > 0;
-        const label = hasItems
-            ? `Sprzedaj ${n === 1 ? 'zasób' : `${n} zasoby`}  (Spacja)`
-            : 'Koszyk pusty';
-        this.sellBtn.setText(label);
+        this.sellBtn.setText(hasItems ? 'Sprzedaj zasób  (Spacja)' : 'Koszyk pusty');
         this.sellBtn.setStyle({
             backgroundColor: hasItems ? '#336633' : '#444444',
             color: hasItems ? '#ffffff' : '#888888'
@@ -241,51 +202,6 @@ export class Skup extends Phaser.Scene {
         } else {
             this.sellBtn.disableInteractive();
         }
-    }
-
-    private refreshInfoText(): void {
-        const n = SELL_SPEED_ITEMS[this.sellSpeedLevel];
-        this.infoText.setText(`Jedno kliknięcie sprzedaje ${n} ${n === 1 ? 'zasób' : 'zasoby'} na raz`);
-    }
-
-    private refreshUpgradeButton(): void {
-        const level = this.sellSpeedLevel;
-        const maxLevel = SELL_SPEED_COSTS.length;
-        if (level >= maxLevel) {
-            this.upgradeBtn.setText('⚡ Szybka sprzedaż: MAX');
-            this.upgradeBtn.setStyle({ backgroundColor: '#444444', color: '#888888' });
-            this.upgradeBtn.disableInteractive();
-            return;
-        }
-        const cost = SELL_SPEED_COSTS[level];
-        const canAfford = this.coins >= cost;
-        const nextN = SELL_SPEED_ITEMS[level + 1];
-        const label = `⚡ Ulepsz sprzedaż: ${nextN} na raz  (${cost} monet)`;
-        this.upgradeBtn.setText(label);
-        this.upgradeBtn.setStyle({
-            backgroundColor: canAfford ? '#664400' : '#443300',
-            color: canAfford ? '#ffffff' : '#888888'
-        });
-        this.upgradeBtn.off('pointerover').off('pointerout').off('pointerdown');
-        this.upgradeBtn.disableInteractive();
-        if (canAfford) {
-            this.upgradeBtn.setInteractive({ useHandCursor: true });
-            this.upgradeBtn.on('pointerover', () => this.upgradeBtn.setStyle({ backgroundColor: '#996600' }));
-            this.upgradeBtn.on('pointerout', () => this.upgradeBtn.setStyle({ backgroundColor: '#664400' }));
-            this.upgradeBtn.on('pointerdown', () => this.buySpeedUpgrade());
-        }
-    }
-
-    private buySpeedUpgrade(): void {
-        const cost = SELL_SPEED_COSTS[this.sellSpeedLevel];
-        if (this.coins < cost) return;
-        this.coins -= cost;
-        this.sellSpeedLevel++;
-        this.registry.set('sellSpeedLevel', this.sellSpeedLevel);
-        this.coinsText.setText(`Monety: ${this.coins}`);
-        this.refreshSellButton();
-        this.refreshInfoText();
-        this.refreshUpgradeButton();
     }
 
     private close(): void {

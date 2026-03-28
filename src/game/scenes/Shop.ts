@@ -151,9 +151,9 @@ export class Shop extends Phaser.Scene {
         backBtn.on('pointerout', () => backBtn.setStyle({ backgroundColor: '#883300' }));
         backBtn.on('pointerdown', () => this.closeShop());
 
-        // Keyboard shortcuts: 1-6 buy upgrade, Backspace closes shop
+        // Keyboard shortcuts: 1-6 buy upgrade, Backspace/Escape closes shop
         this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
-            if (event.key === 'Backspace') {
+            if (event.key === 'Backspace' || event.key === 'Escape') {
                 this.closeShop();
             } else {
                 const index = parseInt(event.key) - 1;

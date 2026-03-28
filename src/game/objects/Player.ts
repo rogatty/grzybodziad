@@ -20,6 +20,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Colored ellipse drawn behind the outline sprite
     readonly bodyFill: Phaser.GameObjects.Ellipse;
 
+    // Base scale used as reference for squish/stretch animation
+    private baseScaleX = 1;
+    private baseScaleY = 1;
+
     constructor(scene: Phaser.Scene, x: number, y: number) {
         const costumeKey: string = scene.registry.get('activeCostume') ?? DEFAULT_COSTUME_ID;
         const costumeData = COSTUMES.find(c => c.id === costumeKey) ?? COSTUMES[0];
@@ -30,6 +34,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.setCollideWorldBounds(true);
         this.setDepth(10);
         if (costumeData.sprite) this.setDisplaySize(56, 80);
+        this.baseScaleX = this.scaleX;
+        this.baseScaleY = this.scaleY;
 
         // Colored fill sits just behind the outline (only for default costume without sprite)
         this.bodyFill = scene.add.ellipse(x, y, 56, 80, costumeData.color).setDepth(9);
@@ -66,11 +72,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.setTexture(costumeData.sprite ?? 'player');
         if (costumeData.sprite) {
             this.setDisplaySize(56, 80);
-            this.bodyFill.setVisible(false);
         } else {
             this.setScale(1);
-            this.bodyFill.setVisible(false);
         }
+        this.bodyFill.setVisible(false);
+        this.baseScaleX = this.scaleX;
+        this.baseScaleY = this.scaleY;
         this.scene.registry.set('activeCostume', costumeKey);
     }
 
@@ -91,9 +98,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             else if (right) vx = this.speed;
             if (up) vy = -this.speed;
             else if (down) vy = this.speed;
+
+            // Normalize diagonal keyboard movement
+            if (vx !== 0 && vy !== 0) {
+                vx *= 0.707;
+                vy *= 0.707;
+            }
         }
 
-        // Touch input overrides keyboard when active
+        // Touch/mouse input overrides keyboard when active
         if (this.touchTarget) {
             const dx = this.touchTarget.x - this.x;
             const dy = this.touchTarget.y - this.y;
@@ -108,12 +121,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             }
         }
 
-        // Normalize diagonal movement
-        if (vx !== 0 && vy !== 0) {
-            vx *= 0.707;
-            vy *= 0.707;
-        }
-
         body.setVelocity(vx, vy);
 
         // Keep fill ellipse under the player
@@ -122,5 +129,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         // Flip sprite based on direction
         if (vx < 0) this.setFlipX(true);
         else if (vx > 0) this.setFlipX(false);
+
+        // Squish & stretch animation
+        const isMoving = vx !== 0 || vy !== 0;
+        if (isMoving) {
+            const t = this.scene.time.now / 1000;
+            const squish = Math.sin(t * 12) * 0.05; // rytm kroków
+            this.setScale(
+                this.baseScaleX * (1 - squish * 0.5),
+                this.baseScaleY * (1 + squish)
+            );
+        } else {
+            // Płynny powrót do normalnego rozmiaru
+            this.setScale(
+                Phaser.Math.Linear(this.scaleX, this.baseScaleX, 0.15),
+                Phaser.Math.Linear(this.scaleY, this.baseScaleY, 0.15)
+            );
+        }
     }
 }
