@@ -1,0 +1,19 @@
+{
+    "name": "grzybodziad",
+    "version": "1.0.0",
+    "description": "2D resource-collecting game for kids",
+    "private": true,
+    "scripts": {
+        "dev": "vite --config vite/config.dev.mjs",
+        "build": "tsc && vite build --config vite/config.prod.mjs",
+        "preview": "vite preview --config vite/config.prod.mjs"
+    },
+    "dependencies": {
+        "phaser": "^3.90.0"
+    },
+    "devDependencies": {
+        "typescript": "~5.7.2",
+        "vite": "^6.3.1",
+        "terser": "^5.39.0"
+    }
+}

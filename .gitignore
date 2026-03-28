@@ -1,0 +1,6 @@
+node_modules/
+dist/
+raw-assets/
+.env
+.DS_Store
+*.log
