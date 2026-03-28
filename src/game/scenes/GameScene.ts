@@ -23,7 +23,6 @@ import { COSTUMES, DEFAULT_COSTUME_ID } from '../data/costumes';
 export class GameScene extends Phaser.Scene {
     private player!: Player;
     private resources: Resource[] = [];
-    private stoneList: Array<{ x: number, y: number, radius: number }> = [];
 
     private score = 0;
     private coins = 0;
@@ -66,7 +65,6 @@ export class GameScene extends Phaser.Scene {
     private zoomStage = 0;
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
     private bgImage!: Phaser.GameObjects.TileSprite;
-    private stoneImages: Phaser.GameObjects.Image[] = [];
     private fogOverlay!: Phaser.GameObjects.Image;
 
     constructor() {
@@ -78,7 +76,6 @@ export class GameScene extends Phaser.Scene {
         this.score = 0;
         this.timeLeft = this.registry.get('roundDuration') ?? ROUND_DURATION;
         this.resources = [];
-        this.stoneImages = [];
         this.basket = [];
         this.hutEntered = false;
         this.hutOnCooldown = false;
@@ -121,30 +118,6 @@ export class GameScene extends Phaser.Scene {
         // Background — tiled across the full world
         this.bgImage = this.add.tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH, WORLD_HEIGHT, 'background');
 
-        // Stones — no physics bodies, manual circle collision in update()
-        this.stoneList = [];
-        const stoneCount = 28; // ~4x more stones for 4x larger world
-        const forbiddenZones = [
-            { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, r: 100 },
-            { x: WORLD_WIDTH / 2 + 180, y: WORLD_HEIGHT / 2 - 120, r: 90 },
-        ];
-        let placed = 0;
-        let attempts = 0;
-        while (placed < stoneCount && attempts < 800) {
-            attempts++;
-            const margin = 70;
-            const sx = Phaser.Math.Between(margin, WORLD_WIDTH - margin);
-            const sy = Phaser.Math.Between(margin + 40, WORLD_HEIGHT - margin - 40);
-            const tooClose = forbiddenZones.some(z =>
-                Phaser.Math.Distance.Between(sx, sy, z.x, z.y) < z.r
-            );
-            if (tooClose) continue;
-            const scale = Phaser.Math.FloatBetween(0.5, 1.6);
-            const stoneImg = this.add.image(sx, sy, 'stone').setScale(scale).setDepth(3);
-            this.stoneImages.push(stoneImg);
-            this.stoneList.push({ x: sx, y: sy, radius: 20 * scale });
-            placed++;
-        }
 
         // Extend physics world to match the current zone
         const zone0 = this.getZoneBounds(0);
@@ -292,7 +265,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay]);
 
         // UI camera ignores all game world objects (fog stays visible in UI camera)
-        this.uiCamera.ignore([this.bgImage, ...this.stoneImages, this.player, this.player.bodyFill, this.hut, this.costumeHut, this.skupHut]);
+        this.uiCamera.ignore([this.bgImage, this.player, this.player.bodyFill, this.hut, this.costumeHut, this.skupHut]);
 
         // Add first bin after cameras are set up (so uiCamera.ignore works)
         this.addTrashBin(0);
@@ -391,7 +364,6 @@ export class GameScene extends Phaser.Scene {
         } while (
             attempts < 20 &&
             (
-                this.stoneList.some(s => Phaser.Math.Distance.Between(x, y, s.x, s.y) < s.radius + 30) ||
                 this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 70) ||
                 this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < 60) ||
                 [this.hut, this.costumeHut, this.skupHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 110)
@@ -416,35 +388,30 @@ export class GameScene extends Phaser.Scene {
         const cx = zone.x + zone.w / 2;
         const cy = zone.y + zone.h / 2;
 
-        // Stay within 55% of zone half-size from center — safely inside fog boundary (fog starts at 80%)
-        // At corner (both axes at 55%): normalized distance = sqrt(0.55²+0.55²) ≈ 0.78 < 0.80 ✓
-        const safeX = zone.w * 0.275; // 55% of half-width
-        const safeY = zone.h * 0.275; // 55% of half-height
-        const innerX = zone.w * 0.10; // keep some distance from center
-        const innerY = zone.h * 0.10;
-
-        // Each quadrant is a corner of the safe area: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
-        const quadrant = this.binQuadrants[stage];
-        const xRange = quadrant % 2 === 0
-            ? { min: cx - safeX, max: cx - innerX }
-            : { min: cx + innerX, max: cx + safeX };
-        const yRange = quadrant < 2
-            ? { min: cy - safeY, max: cy - innerY }
-            : { min: cy + innerY, max: cy + safeY };
+        // Stay within 70% of zone half-size from center — safely inside fog boundary (fog starts at 80%)
+        // IMPORTANT: trash bins must never spawn in the fog area — players can't reach them there
+        const safeX = zone.w * 0.35; // 70% of half-width
+        const safeY = zone.h * 0.35; // 70% of half-height
+        const xMin = cx - safeX;
+        const xMax = cx + safeX;
+        const yMin = cy - safeY;
+        const yMax = cy + safeY;
 
         let x = 0, y = 0;
         let attempts = 0;
         do {
-            x = Phaser.Math.Between(xRange.min, xRange.max);
-            y = Phaser.Math.Between(yRange.min, yRange.max);
+            x = Phaser.Math.Between(xMin, xMax);
+            y = Phaser.Math.Between(yMin, yMax);
             attempts++;
 
-            if (Phaser.Math.Distance.Between(x, y, this.hut.x, this.hut.y) < 160) continue;
-            if (Phaser.Math.Distance.Between(x, y, WORLD_WIDTH / 2, WORLD_HEIGHT / 2) < 160) continue;
-            if (this.trashBins.some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 350)) continue;
+            if ([this.hut, this.costumeHut, this.skupHut].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 150)) continue;
+            if (Phaser.Math.Distance.Between(x, y, cx, cy) < 120) continue;
+            if (this.trashBins.some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 300)) continue;
 
             break;
         } while (attempts < 100);
+
+        if ([this.hut, this.costumeHut, this.skupHut].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 150)) return;
 
         const bin = this.add.image(x, y, 'trashbin').setDepth(5);
         this.trashBins.push(bin);
@@ -465,7 +432,6 @@ export class GameScene extends Phaser.Scene {
         } while (
             attempts < 20 &&
             (
-                this.stoneList.some(s => Phaser.Math.Distance.Between(x, y, s.x, s.y) < s.radius + 30) ||
                 this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 60) ||
                 this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < 70) ||
                 [this.hut, this.costumeHut, this.skupHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 110)
@@ -771,17 +737,6 @@ export class GameScene extends Phaser.Scene {
         // Draw freshness bars
         this.drawFreshnessBars(now);
 
-        // Manual circle collision with stones
-        const playerR = 12;
-        for (const stone of this.stoneList) {
-            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, stone.x, stone.y);
-            const minDist = playerR + stone.radius;
-            if (dist < minDist && dist > 0) {
-                const angle = Phaser.Math.Angle.Between(stone.x, stone.y, this.player.x, this.player.y);
-                this.player.x = stone.x + Math.cos(angle) * minDist;
-                this.player.y = stone.y + Math.sin(angle) * minDist;
-            }
-        }
 
         if (nearResourceWhileFull && this.time.now - this.lastBasketFullWarning > 2000) {
             this.lastBasketFullWarning = this.time.now;
