@@ -43,20 +43,20 @@ export class GameOver extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Play again button
-        const playBtn = this.add.text(width / 2, height / 2 + 100, '▶  Jeszcze raz', {
-            fontSize: '28px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffffff',
-            backgroundColor: '#227722',
-            padding: { x: 20, y: 12 }
-        })
-            .setOrigin(0.5)
+        const BTN_W = 360, BTN_H = 52;
+        const btnY = height / 2 + 100;
+        const playBg = this.add.rectangle(width / 2, btnY, BTN_W, BTN_H, 0x227722)
             .setInteractive({ useHandCursor: true });
+        this.add.image(width / 2 - BTN_W / 2 + 55, btnY, 'key_space').setDisplaySize(52, 22);
+        this.add.text(width / 2 + 15, btnY, 'Jeszcze raz', {
+            fontSize: '26px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
+        }).setOrigin(0.5);
 
-        playBtn.on('pointerover', () => playBtn.setStyle({ backgroundColor: '#33aa33' }));
-        playBtn.on('pointerout', () => playBtn.setStyle({ backgroundColor: '#227722' }));
-        playBtn.on('pointerdown', () => {
-            this.scene.start('GameScene');
-        });
+        const startGame = () => this.scene.start('GameScene');
+        playBg.on('pointerover', () => playBg.setFillStyle(0x33aa33));
+        playBg.on('pointerout', () => playBg.setFillStyle(0x227722));
+        playBg.on('pointerdown', startGame);
+
+        this.input.keyboard!.on('keydown-SPACE', startGame);
     }
 }
