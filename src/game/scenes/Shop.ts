@@ -34,27 +34,27 @@ export class Shop extends Phaser.Scene {
         this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
 
         // Panel
-        this.add.rectangle(width / 2, height / 2, 520, 420, 0x1a1a3e, 0.95)
+        this.add.rectangle(width / 2, height / 2, 520, 500, 0x1a1a3e, 0.95)
             .setStrokeStyle(3, 0x8888ff);
 
         // Title
-        this.add.text(width / 2, height / 2 - 180, '🛍  Sklep', {
+        this.add.text(width / 2, height / 2 - 215, '🛍  Sklep', {
             fontSize: '36px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#ffffff'
         }).setOrigin(0.5);
 
         // Score display
-        this.scoreText = this.add.text(width / 2, height / 2 - 130, `Twoje punkty: ${this.score}`, {
+        this.scoreText = this.add.text(width / 2, height / 2 - 165, `Twoje punkty: ${this.score}`, {
             fontSize: '22px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffff88'
         }).setOrigin(0.5);
 
         // Upgrade rows
-        const upgradeIcons = ['upgrade-speed', 'upgrade-radius', 'upgrade-spawns'];
+        const upgradeIcons = ['upgrade-speed', 'upgrade-radius', 'upgrade-spawns', 'upgrade-basket'];
         UPGRADES.forEach((upgrade, i) => {
-            const rowY = height / 2 - 60 + i * 90;
+            const rowY = height / 2 - 105 + i * 80;
 
             // Icon
             this.add.image(width / 2 - 220, rowY, upgradeIcons[i]).setDisplaySize(52, 52);
@@ -102,7 +102,7 @@ export class Shop extends Phaser.Scene {
         });
 
         // Back button
-        const backBtn = this.add.text(width / 2, height / 2 + 180, '← Wróć do gry', {
+        const backBtn = this.add.text(width / 2, height / 2 + 215, '← Wróć do gry', {
             fontSize: '24px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffffff',

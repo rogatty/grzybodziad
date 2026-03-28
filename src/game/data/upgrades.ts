@@ -31,6 +31,14 @@ export const UPGRADES: Upgrade[] = [
         baseCost: 8,
         maxLevel: 3,
         effect: (level) => level * 3 // +3 max resources per level
+    },
+    {
+        id: 'basket',
+        namePL: 'Pojemny koszyk',
+        descriptionPL: 'Więcej miejsca w koszyku!',
+        baseCost: 5,
+        maxLevel: 4,
+        effect: (level) => level * 3 // +3 capacity per level
     }
 ];
 

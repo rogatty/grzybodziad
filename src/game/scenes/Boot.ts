@@ -130,6 +130,37 @@ export class Boot extends Phaser.Scene {
         spawnsGfx.generateTexture('upgrade-spawns', 64, 64);
         spawnsGfx.destroy();
 
+        // Stone: gray rock shape — tight texture, no padding
+        const stoneGfx = this.make.graphics({ x: 0, y: 0 });
+        stoneGfx.fillStyle(0x888888);
+        stoneGfx.fillEllipse(26, 20, 50, 38);
+        stoneGfx.fillStyle(0xaaaaaa);
+        stoneGfx.fillEllipse(18, 13, 22, 13);
+        stoneGfx.fillStyle(0x666666);
+        stoneGfx.fillEllipse(34, 28, 14, 9);
+        stoneGfx.generateTexture('stone', 52, 40);
+        stoneGfx.destroy();
+
+        // Upgrade icon: basket — big basket with stars
+        const basketGfx = this.make.graphics({ x: 0, y: 0 });
+        basketGfx.fillStyle(0x8b6030);
+        basketGfx.fillRect(10, 8, 6, 18);
+        basketGfx.fillRect(48, 8, 6, 18);
+        basketGfx.fillRect(10, 8, 44, 6);
+        basketGfx.fillStyle(0xd4a055);
+        basketGfx.fillRoundedRect(4, 24, 56, 34, 6);
+        basketGfx.fillStyle(0xb07835);
+        basketGfx.fillRect(4, 35, 56, 5);
+        basketGfx.fillRect(18, 24, 5, 34);
+        basketGfx.fillRect(41, 24, 5, 34);
+        // Stars inside basket
+        basketGfx.fillStyle(0xffee00);
+        basketGfx.fillCircle(20, 44, 4);
+        basketGfx.fillCircle(32, 38, 5);
+        basketGfx.fillCircle(44, 44, 4);
+        basketGfx.generateTexture('upgrade-basket', 64, 64);
+        basketGfx.destroy();
+
         // Hut: simple house with roof and door
         const hutGfx = this.make.graphics({ x: 0, y: 0 });
         // Walls

@@ -1,8 +1,9 @@
 export const PLAYER_BASE_SPEED = 200;
+export const BASKET_BASE_CAPACITY = 5;
 export const COLLECTION_RADIUS = 40;
 export const RESOURCE_SPAWN_INTERVAL = 2000; // ms
 export const MAX_RESOURCES_ON_SCREEN = 15;
-export const ROUND_DURATION = 60; // seconds
+export const ROUND_DURATION = 180; // seconds
 
 export const RESOURCE_TYPES = ['mushroom', 'berry', 'flower'] as const;
 export type ResourceType = typeof RESOURCE_TYPES[number];
