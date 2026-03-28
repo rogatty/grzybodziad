@@ -79,15 +79,19 @@ export class Shop extends Phaser.Scene {
                 ? 'MAX'
                 : `Kup  (${cost} pkt)  Poziom: ${level}/${upgrade.maxLevel}`;
 
+            const canAfford = !maxed && this.score >= cost;
+            const btnColor = maxed ? '#888888' : (canAfford ? '#ffffff' : '#888888');
+            const btnBg = maxed ? '#444444' : (canAfford ? '#336633' : '#553333');
+
             const btn = this.add.text(width / 2 + 140, rowY, btnLabel, {
                 fontSize: '18px',
                 fontFamily: 'Arial, sans-serif',
-                color: maxed ? '#888888' : '#ffffff',
-                backgroundColor: maxed ? '#444444' : '#336633',
+                color: btnColor,
+                backgroundColor: btnBg,
                 padding: { x: 14, y: 8 }
             }).setOrigin(0.5);
 
-            if (!maxed) {
+            if (canAfford) {
                 btn.setInteractive({ useHandCursor: true });
                 btn.on('pointerover', () => btn.setStyle({ backgroundColor: '#44aa44' }));
                 btn.on('pointerout', () => btn.setStyle({ backgroundColor: '#336633' }));
@@ -125,18 +129,33 @@ export class Shop extends Phaser.Scene {
         this.registry.set('upgradeLevels', { ...this.upgradeLevels });
 
         this.scoreText.setText(`Twoje punkty: ${this.score}`);
+        this.refreshButtons();
+    }
 
-        // Refresh button label
-        const newLevel = this.upgradeLevels[upgradeId];
-        const maxed = newLevel >= upgrade.maxLevel;
-        const newCost = upgradeCost(upgrade, newLevel);
-        const btn = this.upgradeTexts[index];
+    private refreshButtons(): void {
+        UPGRADES.forEach((upgrade, i) => {
+            const btn = this.upgradeTexts[i];
+            const level = this.upgradeLevels[upgrade.id] ?? 0;
+            const cost = upgradeCost(upgrade, level);
+            const maxed = level >= upgrade.maxLevel;
+            const canAfford = !maxed && this.score >= cost;
 
-        btn.setText(maxed ? 'MAX' : `Kup  (${newCost} pkt)  Poziom: ${newLevel}/${upgrade.maxLevel}`);
-        if (maxed) {
-            btn.setStyle({ color: '#888888', backgroundColor: '#444444' });
+            btn.setText(maxed ? 'MAX' : `Kup  (${cost} pkt)  Poziom: ${level}/${upgrade.maxLevel}`);
             btn.removeInteractive();
-        }
+            btn.removeAllListeners();
+
+            if (maxed) {
+                btn.setStyle({ color: '#888888', backgroundColor: '#444444' });
+            } else if (canAfford) {
+                btn.setStyle({ color: '#ffffff', backgroundColor: '#336633' });
+                btn.setInteractive({ useHandCursor: true });
+                btn.on('pointerover', () => btn.setStyle({ backgroundColor: '#44aa44' }));
+                btn.on('pointerout', () => btn.setStyle({ backgroundColor: '#336633' }));
+                btn.on('pointerdown', () => this.buyUpgrade(upgrade.id, i));
+            } else {
+                btn.setStyle({ color: '#888888', backgroundColor: '#553333' });
+            }
+        });
     }
 
     private closeShop(): void {
