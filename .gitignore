@@ -4,3 +4,5 @@ raw-assets/
 .env
 .DS_Store
 *.log
+.playwright-mcp/
+.vscode/
