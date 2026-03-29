@@ -1,11 +1,11 @@
-import Phaser from 'phaser';
 import { UPGRADES, upgradeCost } from '../data/upgrades';
+import { ModalScene } from './ModalScene';
 
 interface ShopData {
     coins: number;
 }
 
-export class Shop extends Phaser.Scene {
+export class Shop extends ModalScene {
     private coins = 0;
     private upgradeLevels: Record<string, number> = {};
     private coinsText!: Phaser.GameObjects.Text;
@@ -188,7 +188,6 @@ export class Shop extends Phaser.Scene {
     }
 
     private closeShop(): void {
-        this.scene.resume('GameScene', { coins: this.coins });
-        this.scene.stop('Shop');
+        this.closeAndResume('GameScene', { coins: this.coins });
     }
 }

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { ResourceType, RESOURCE_POINTS, RESOURCE_TEXTURES } from '../data/constants';
+import { Collectible } from './Collectible';
 
-export class Resource extends Phaser.Physics.Arcade.Sprite {
+export class Resource extends Collectible {
     readonly resourceType: ResourceType;
     readonly points: number;
 
@@ -12,13 +13,6 @@ export class Resource extends Phaser.Physics.Arcade.Sprite {
         this.resourceType = type;
         this.points = RESOURCE_POINTS[type];
 
-        scene.add.existing(this);
-        this.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
-
-        // Spawn animation
-        this.setScale(0);
-        scene.tweens.add({ targets: this, scale: 1, duration: 300, ease: 'Back.out' });
-
         // Floating animation
         scene.tweens.add({
             targets: this,
@@ -27,17 +21,6 @@ export class Resource extends Phaser.Physics.Arcade.Sprite {
             ease: 'Sine.inOut',
             yoyo: true,
             repeat: -1
-        });
-    }
-
-    collect(): void {
-        this.scene.tweens.add({
-            targets: this,
-            scale: 1.5,
-            alpha: 0,
-            duration: 200,
-            ease: 'Quad.out',
-            onComplete: () => this.destroy()
         });
     }
 }

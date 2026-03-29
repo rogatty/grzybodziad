@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TRASH_BASE_COINS } from '../data/constants';
-
-type BasketItem = { points: number; spoilAt: number; resourceType: string; textureKey?: string };
+import { BasketItem } from '../data/types';
+import { ModalScene } from './ModalScene';
 
 interface TrashBinData {
     trashBag: string[];
@@ -9,7 +9,7 @@ interface TrashBinData {
     coins: number;
 }
 
-export class TrashBin extends Phaser.Scene {
+export class TrashBin extends ModalScene {
     private trashBag: string[] = [];         // items from game's trashBag
     private basketTrash: BasketItem[] = [];  // trash items from basket
     private nonTrashBasket: BasketItem[] = [];
@@ -171,12 +171,11 @@ export class TrashBin extends Phaser.Scene {
     }
 
     private close(): void {
-        this.scene.resume('GameScene', {
+        this.closeAndResume('GameScene', {
             trashBag: this.trashBag,
             basket: [...this.nonTrashBasket, ...this.basketTrash],
             coins: this.coins,
             fromTrashBin: true
         });
-        this.scene.stop('TrashBin');
     }
 }

@@ -1,12 +1,12 @@
-import Phaser from 'phaser';
 import { COSTUMES, DEFAULT_COSTUME_ID } from '../data/costumes';
 import { DEBUG_ALL_COSTUMES_OWNED } from '../data/debug';
+import { ModalScene } from './ModalScene';
 
 interface CostumeShopData {
     coins: number;
 }
 
-export class CostumeShop extends Phaser.Scene {
+export class CostumeShop extends ModalScene {
     private coins = 0;
     private ownedCostumes: string[] = [];
     private activeCostume = DEFAULT_COSTUME_ID;
@@ -175,7 +175,6 @@ export class CostumeShop extends Phaser.Scene {
     }
 
     private close(): void {
-        this.scene.resume('GameScene', { coins: this.coins, costume: this.activeCostume });
-        this.scene.stop('CostumeShop');
+        this.closeAndResume('GameScene', { coins: this.coins, costume: this.activeCostume });
     }
 }

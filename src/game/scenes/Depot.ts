@@ -1,17 +1,17 @@
 import Phaser from 'phaser';
 import { ResourceType, BASKET_BASE_CAPACITY } from '../data/constants';
+import { BasketItem } from '../data/types';
 import { UPGRADES } from '../data/upgrades';
 import { DEBUG_FILL_BASKET } from '../data/debug';
+import { ModalScene } from './ModalScene';
 
-type BasketItem = { points: number; spoilAt: number; resourceType: ResourceType | 'trash'; textureKey?: string };
-
-interface SkupData {
+interface DepotData {
     basket: BasketItem[];
     coins: number;
     score: number;
 }
 
-export class Skup extends Phaser.Scene {
+export class Depot extends ModalScene {
     private basket: BasketItem[] = [];       // only sellable (non-trash)
     private trashBasket: BasketItem[] = [];  // trash — returned untouched on close
     private coins = 0;
@@ -23,10 +23,10 @@ export class Skup extends Phaser.Scene {
     private sellLabel!: Phaser.GameObjects.Text;
 
     constructor() {
-        super('Skup');
+        super('Depot');
     }
 
-    init(data: SkupData): void {
+    init(data: DepotData): void {
         this.basket = data.basket.filter(i => i.resourceType !== 'trash');
         this.trashBasket = data.basket.filter(i => i.resourceType === 'trash');
         this.coins = data.coins ?? 0;
@@ -233,12 +233,11 @@ export class Skup extends Phaser.Scene {
     }
 
     private close(): void {
-        this.scene.resume('GameScene', {
+        this.closeAndResume('GameScene', {
             basket: [...this.basket, ...this.trashBasket],
             coins: this.coins,
             score: this.score,
-            fromSkup: true
+            fromDepot: true
         });
-        this.scene.stop('Skup');
     }
 }

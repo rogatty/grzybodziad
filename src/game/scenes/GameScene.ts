@@ -15,8 +15,20 @@ import {
     WORLD_WIDTH,
     WORLD_HEIGHT,
     TRASH_SPAWN_INTERVAL,
-    MAX_TRASH_ON_SCREEN
+    MAX_TRASH_ON_SCREEN,
+    PLAYER_BASE_SPEED,
+    COLLECTION_RADIUS,
+    HUT_ENTRY_RADIUS,
+    HUT_EXIT_RADIUS,
+    HUT_AVOIDANCE_DISTANCE,
+    RESOURCE_MIN_SPACING,
+    TRASH_MIN_SPACING,
+    BUILDING_SPAWN_CLEARANCE,
+    BIN_SPACING,
+    FOG_TRANSITION_START,
+    FOG_SAFE_MARGIN
 } from '../data/constants';
+import { BasketItem } from '../data/types';
 import { UPGRADES, upgradeCost } from '../data/upgrades';
 import { COSTUMES, DEFAULT_COSTUME_ID } from '../data/costumes';
 
@@ -27,7 +39,7 @@ export class GameScene extends Phaser.Scene {
     private score = 0;
     private coins = 0;
     private timeLeft = ROUND_DURATION;
-    private basket: Array<{ points: number; spoilAt: number; resourceType: ResourceType | 'trash'; textureKey?: string }> = [];
+    private basket: BasketItem[] = [];
     private basketCapacity = BASKET_BASE_CAPACITY;
     private trashBag: string[] = [];
     private trashBagCapacity = 0;
@@ -45,16 +57,13 @@ export class GameScene extends Phaser.Scene {
     private lastTrashBagFullWarning = 0;
 
     private hut!: Phaser.GameObjects.Image;
-    private hutEntered = false;
-    private hutOnCooldown = false;
+    private hutState = { entered: false, onCooldown: false };
 
     private costumeHut!: Phaser.GameObjects.Image;
-    private costumeHutEntered = false;
-    private costumeHutOnCooldown = false;
+    private costumeHutState = { entered: false, onCooldown: false };
 
-    private skupHut!: Phaser.GameObjects.Image;
-    private skupHutEntered = false;
-    private skupHutOnCooldown = false;
+    private depotHut!: Phaser.GameObjects.Image;
+    private depotHutState = { entered: false, onCooldown: false };
 
     private trashBins: Phaser.GameObjects.Image[] = [];
     private binQuadrants: number[] = [];
@@ -80,18 +89,15 @@ export class GameScene extends Phaser.Scene {
         this.timeLeft = this.registry.get('roundDuration') ?? ROUND_DURATION;
         this.resources = [];
         this.basket = [];
-        this.hutEntered = false;
-        this.hutOnCooldown = false;
+        this.hutState = { entered: false, onCooldown: false };
+        this.costumeHutState = { entered: false, onCooldown: false };
+        this.depotHutState = { entered: false, onCooldown: false };
         this.coins = 0;
         this.zoomStage = 0;
         this.trashBag = [];
         this.trashes = [];
         this.trashBins = [];
         this.binEntered = false;
-        this.costumeHutEntered = false;
-        this.costumeHutOnCooldown = false;
-        this.skupHutEntered = false;
-        this.skupHutOnCooldown = false;
         // Shuffle quadrants so each game puts bins in different corners
         this.binQuadrants = Phaser.Utils.Array.Shuffle([0, 1, 2, 3]);
 
@@ -204,16 +210,15 @@ export class GameScene extends Phaser.Scene {
         this.costumeHut = this.add.image(WORLD_WIDTH / 2 - 180, WORLD_HEIGHT / 2 - 120, 'costume_hut').setDepth(5);
         this.costumeHut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
-        // Skup (resource market) — below player start
-        this.skupHut = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2 + 160, 'skup_hut').setDepth(5);
-        this.skupHut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
+        // Depot (resource market) — below player start
+        this.depotHut = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2 + 160, 'skup_hut').setDepth(5);
+        this.depotHut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
 
-        // Listen for shop/costume-shop/skup closing
-        type BasketItem = { points: number; spoilAt: number; resourceType: ResourceType | 'trash'; textureKey?: string };
+        // Listen for modal scenes closing
         this.events.on('resume', (sys: Phaser.Scenes.Systems, data: {
             coins?: number; costume?: string;
-            basket?: BasketItem[]; score?: number; fromSkup?: boolean;
+            basket?: BasketItem[]; score?: number; fromDepot?: boolean;
             trashBag?: string[]; fromTrashBin?: boolean;
         }) => {
             if (data?.coins !== undefined) {
@@ -233,8 +238,8 @@ export class GameScene extends Phaser.Scene {
                 const nearBin = this.trashBins.find(bin =>
                     Phaser.Math.Distance.Between(this.player.x, this.player.y, bin.x, bin.y) < 55
                 );
-            } else if (data?.fromSkup) {
-                // Returned from skup — update basket and score
+            } else if (data?.fromDepot) {
+                // Returned from depot — update basket and score
                 if (data.basket !== undefined) {
                     this.basket = data.basket;
                     this.updateBasketUI();
@@ -243,13 +248,13 @@ export class GameScene extends Phaser.Scene {
                     this.score = data.score;
                     this.scoreText.setText(`🏆 ${this.score}`);
                 }
-                this.skupHutEntered = true;
-                this.skupHutOnCooldown = true;
+                this.depotHutState.entered = true;
+                this.depotHutState.onCooldown = true;
             } else if (data?.costume !== undefined) {
                 // Returned from costume shop
                 this.player.setCostume(data.costume);
-                this.costumeHutEntered = true;
-                this.costumeHutOnCooldown = true;
+                this.costumeHutState.entered = true;
+                this.costumeHutState.onCooldown = true;
             } else {
                 // Returned from main shop — re-apply upgrades
                 const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
@@ -257,8 +262,8 @@ export class GameScene extends Phaser.Scene {
                 const radiusLevel = upgradeLevels['radius'] ?? 0;
                 const basketLevel = upgradeLevels['basket'] ?? 0;
                 const trashbagLevel = upgradeLevels['trashbag'] ?? 0;
-                this.player.speed = 200 + UPGRADES[0].effect(speedLevel);
-                this.player.collectionRadius = 40 + UPGRADES[1].effect(radiusLevel);
+                this.player.speed = PLAYER_BASE_SPEED + UPGRADES[0].effect(speedLevel);
+                this.player.collectionRadius = COLLECTION_RADIUS + UPGRADES[1].effect(radiusLevel);
                 this.basketCapacity = BASKET_BASE_CAPACITY + UPGRADES[3].effect(basketLevel);
                 this.trashBagCapacity = UPGRADES[4].effect(trashbagLevel);
 
@@ -275,8 +280,8 @@ export class GameScene extends Phaser.Scene {
                 this.updateBasketUI();
                 this.updateTrashBagUI();
 
-                this.hutEntered = true;
-                this.hutOnCooldown = true;
+                this.hutState.entered = true;
+                this.hutState.onCooldown = true;
             }
 
             this.spawnTimer.paused = false;
@@ -299,7 +304,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay, ...this.basketSlotImages, ...this.trashSlotImages]);
 
         // UI camera ignores all game world objects (fog stays visible in UI camera)
-        this.uiCamera.ignore([this.bgImage, this.player, this.hut, this.costumeHut, this.skupHut]);
+        this.uiCamera.ignore([this.bgImage, this.player, this.hut, this.costumeHut, this.depotHut]);
 
         // Add first bin after cameras are set up (so uiCamera.ignore works)
         this.addTrashBin(0);
@@ -357,7 +362,7 @@ export class GameScene extends Phaser.Scene {
         ctx.scale(w / h, 1); // stretch x axis to match screen aspect ratio → circle becomes ellipse
 
         const r = h * 0.52; // radius in scaled space — larger = less dark corners
-        const grad = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r); // 0.8 = shorter transition (~half)
+        const grad = ctx.createRadialGradient(0, 0, r * FOG_TRANSITION_START, 0, 0, r);
         grad.addColorStop(0, 'rgba(0,0,0,1)'); // fully clear in center
         grad.addColorStop(1, 'rgba(0,0,0,0)'); // opaque fog at edge
 
@@ -398,9 +403,9 @@ export class GameScene extends Phaser.Scene {
         } while (
             attempts < 20 &&
             (
-                this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 70) ||
-                this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < 60) ||
-                [this.hut, this.costumeHut, this.skupHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 110)
+                this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < RESOURCE_MIN_SPACING) ||
+                this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < TRASH_MIN_SPACING) ||
+                [this.hut, this.costumeHut, this.depotHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < BUILDING_SPAWN_CLEARANCE)
             )
         );
         if (attempts >= 20) return;
@@ -422,10 +427,10 @@ export class GameScene extends Phaser.Scene {
         const cx = zone.x + zone.w / 2;
         const cy = zone.y + zone.h / 2;
 
-        // Stay within 70% of zone half-size from center — safely inside fog boundary (fog starts at 80%)
+        // Stay within safe margin from center — inside fog boundary (fog starts at FOG_TRANSITION_START)
         // IMPORTANT: trash bins must never spawn in the fog area — players can't reach them there
-        const safeX = zone.w * 0.35; // 70% of half-width
-        const safeY = zone.h * 0.35; // 70% of half-height
+        const safeX = zone.w * FOG_SAFE_MARGIN;
+        const safeY = zone.h * FOG_SAFE_MARGIN;
         const xMin = cx - safeX;
         const xMax = cx + safeX;
         const yMin = cy - safeY;
@@ -438,14 +443,14 @@ export class GameScene extends Phaser.Scene {
             y = Phaser.Math.Between(yMin, yMax);
             attempts++;
 
-            if ([this.hut, this.costumeHut, this.skupHut].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 150)) continue;
+            if ([this.hut, this.costumeHut, this.depotHut].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < HUT_AVOIDANCE_DISTANCE)) continue;
             if (Phaser.Math.Distance.Between(x, y, cx, cy) < 120) continue;
-            if (this.trashBins.some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 300)) continue;
+            if (this.trashBins.some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < BIN_SPACING)) continue;
 
             break;
         } while (attempts < 100);
 
-        if ([this.hut, this.costumeHut, this.skupHut].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 150)) return;
+        if ([this.hut, this.costumeHut, this.depotHut].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < HUT_AVOIDANCE_DISTANCE)) return;
 
         const bin = this.add.image(x, y, 'trashbin').setDepth(5);
         bin.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
@@ -467,9 +472,9 @@ export class GameScene extends Phaser.Scene {
         } while (
             attempts < 20 &&
             (
-                this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 60) ||
-                this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < 70) ||
-                [this.hut, this.costumeHut, this.skupHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 110)
+                this.resources.some(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < TRASH_MIN_SPACING) ||
+                this.trashes.some(t => Phaser.Math.Distance.Between(x, y, t.x, t.y) < RESOURCE_MIN_SPACING) ||
+                [this.hut, this.costumeHut, this.depotHut, ...this.trashBins].some(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < BUILDING_SPAWN_CLEARANCE)
             )
         );
         if (attempts >= 20) return;
@@ -481,20 +486,20 @@ export class GameScene extends Phaser.Scene {
 
     private updateBuildingTints(): void {
         const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
-        const canEnterShop = !this.hutOnCooldown && UPGRADES.some(u => {
+        const canEnterShop = !this.hutState.onCooldown && UPGRADES.some(u => {
             const level = upgradeLevels[u.id] ?? 0;
             return level < u.maxLevel && this.coins >= upgradeCost(u, level);
         });
         if (canEnterShop) this.hut.clearTint(); else this.hut.setTint(0x888888);
 
         const ownedCostumes: string[] = this.registry.get('ownedCostumes') ?? [DEFAULT_COSTUME_ID];
-        const canEnterCostume = !this.costumeHutOnCooldown && (
+        const canEnterCostume = !this.costumeHutState.onCooldown && (
             ownedCostumes.length > 1 || COSTUMES.some(c => !ownedCostumes.includes(c.id) && this.coins >= c.cost)
         );
         if (canEnterCostume) this.costumeHut.clearTint(); else this.costumeHut.setTint(0x888888);
 
-        const canEnterSkup = !this.skupHutOnCooldown && this.basket.some(i => i.resourceType !== 'trash');
-        if (canEnterSkup) this.skupHut.clearTint(); else this.skupHut.setTint(0x888888);
+        const canEnterDepot = !this.depotHutState.onCooldown && this.basket.some(i => i.resourceType !== 'trash');
+        if (canEnterDepot) this.depotHut.clearTint(); else this.depotHut.setTint(0x888888);
 
         const hasTrash = this.trashBag.length > 0 || this.basket.some(i => i.resourceType === 'trash');
         this.trashBins.forEach(bin => hasTrash ? bin.clearTint() : bin.setTint(0x888888));
@@ -719,108 +724,107 @@ export class GameScene extends Phaser.Scene {
         const nx = (this.player.x - cx) / (zone.w / 2);
         const ny = (this.player.y - cy) / (zone.h / 2);
         const d = Math.sqrt(nx * nx + ny * ny);
-        const fogStart = 0.8; // fog begins at 80% of zone radius (matching overlay)
+        const fogStart = FOG_TRANSITION_START;
         if (d <= fogStart) return 1;
         return Math.max(0, 1 - (d - fogStart) / (1 - fogStart));
     }
 
     update(): void {
         this.player.update();
+        this.updateFogPhysics();
+        this.updateBuildingProximity();
+        const now = this.time.now;
+        this.updateItemExpiration(now);
+        this.updateCollections(now);
+        this.drawFreshnessBars(now);
+        this.updateBasketBounce();
+        this.updateBuildingTints();
+    }
 
-        // Slow down only the outward velocity component in fog (tangential movement stays fast)
+    private updateFogPhysics(): void {
         const safeness = this.getFogSafeness();
-        if (safeness < 1) {
-            const body = this.player.body as Phaser.Physics.Arcade.Body;
-            const zone = this.getZoneBounds(this.zoomStage);
-            const toCenterX = (zone.x + zone.w / 2) - this.player.x;
-            const toCenterY = (zone.y + zone.h / 2) - this.player.y;
-            const dist = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
-            if (dist > 0) {
-                // Unit vector pointing away from center
-                const outX = -toCenterX / dist;
-                const outY = -toCenterY / dist;
-                // How much of the velocity goes outward (positive = deeper into fog)
-                const outwardSpeed = body.velocity.x * outX + body.velocity.y * outY;
-                if (outwardSpeed > 0) {
-                    const slowFactor = safeness * safeness;
-                    const reduction = outwardSpeed * (1 - slowFactor);
-                    body.velocity.x -= reduction * outX;
-                    body.velocity.y -= reduction * outY;
-                }
+        if (safeness >= 1) return;
+        const body = this.player.body as Phaser.Physics.Arcade.Body;
+        const zone = this.getZoneBounds(this.zoomStage);
+        const toCenterX = (zone.x + zone.w / 2) - this.player.x;
+        const toCenterY = (zone.y + zone.h / 2) - this.player.y;
+        const dist = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
+        if (dist > 0) {
+            // Unit vector pointing away from center
+            const outX = -toCenterX / dist;
+            const outY = -toCenterY / dist;
+            // How much of the velocity goes outward (positive = deeper into fog)
+            const outwardSpeed = body.velocity.x * outX + body.velocity.y * outY;
+            if (outwardSpeed > 0) {
+                const slowFactor = safeness * safeness;
+                const reduction = outwardSpeed * (1 - slowFactor);
+                body.velocity.x -= reduction * outX;
+                body.velocity.y -= reduction * outY;
             }
         }
+    }
 
-        // Check if player enters the hut
-        const hutDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.hut.x, this.hut.y);
-        if (hutDist < 55) {
-            if (!this.hutEntered && !this.hutOnCooldown) {
-                this.hutEntered = true;
+    private pauseTimersAndScene(): void {
+        this.spawnTimer.paused = true;
+        this.roundTimer.paused = true;
+        this.trashSpawnTimer.paused = true;
+        this.scene.pause('GameScene');
+    }
+
+    private checkHutEntry(
+        hut: Phaser.GameObjects.Image,
+        state: { entered: boolean; onCooldown: boolean },
+        shouldOpen: () => boolean,
+        launchScene: () => void
+    ): void {
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, hut.x, hut.y);
+        if (dist < HUT_ENTRY_RADIUS) {
+            if (!state.entered && !state.onCooldown) {
+                state.entered = true;
+                if (shouldOpen()) {
+                    this.pauseTimersAndScene();
+                    launchScene();
+                }
+            }
+        } else {
+            state.entered = false;
+            if (dist > HUT_EXIT_RADIUS) state.onCooldown = false;
+        }
+    }
+
+    private updateBuildingProximity(): void {
+        this.checkHutEntry(
+            this.hut, this.hutState,
+            () => {
                 const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
-                const canAffordAny = UPGRADES.some(u => {
+                return UPGRADES.some(u => {
                     const level = upgradeLevels[u.id] ?? 0;
                     return level < u.maxLevel && this.coins >= upgradeCost(u, level);
                 });
-                if (canAffordAny) {
-                    this.spawnTimer.paused = true;
-                    this.roundTimer.paused = true;
-                    this.trashSpawnTimer.paused = true;
-                    this.scene.pause('GameScene');
-                    this.scene.launch('Shop', { coins: this.coins });
-                    this.scene.bringToTop('Shop');
-                }
-            }
-        } else {
-            this.hutEntered = false;
-            if (hutDist > 110) this.hutOnCooldown = false;
-        }
-
-        // Check if player enters the costume shop
-        const costumeDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.costumeHut.x, this.costumeHut.y);
-        if (costumeDist < 55) {
-            if (!this.costumeHutEntered && !this.costumeHutOnCooldown) {
-                this.costumeHutEntered = true;
-                const ownedCostumes: string[] = this.registry.get('ownedCostumes') ?? [DEFAULT_COSTUME_ID];
-                const hasMultiple = ownedCostumes.length > 1;
-                const canAffordNew = COSTUMES.some(c => !ownedCostumes.includes(c.id) && this.coins >= c.cost);
-                if (hasMultiple || canAffordNew) {
-                    this.spawnTimer.paused = true;
-                    this.roundTimer.paused = true;
-                    this.trashSpawnTimer.paused = true;
-                    this.scene.pause('GameScene');
-                    this.scene.launch('CostumeShop', { coins: this.coins });
-                    this.scene.bringToTop('CostumeShop');
-                }
-            }
-        } else {
-            this.costumeHutEntered = false;
-            if (costumeDist > 110) this.costumeHutOnCooldown = false;
-        }
-
-        // Check if player enters the skup (resource market)
-        const skupDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.skupHut.x, this.skupHut.y);
-        if (skupDist < 55) {
-            if (!this.skupHutEntered && !this.skupHutOnCooldown) {
-                this.skupHutEntered = true;
-                const hasSellable = this.basket.some(item => item.resourceType !== 'trash');
-                if (hasSellable) {
-                    this.spawnTimer.paused = true;
-                    this.roundTimer.paused = true;
-                    this.trashSpawnTimer.paused = true;
-                    this.scene.pause('GameScene');
-                    this.scene.launch('Skup', { basket: this.basket, coins: this.coins, score: this.score });
-                    this.scene.bringToTop('Skup');
-                }
-            }
-        } else {
-            this.skupHutEntered = false;
-            if (skupDist > 110) this.skupHutOnCooldown = false;
-        }
-
-        // Check if player reaches any trash bin
-        const nearBinObj = this.trashBins.find(bin =>
-            Phaser.Math.Distance.Between(this.player.x, this.player.y, bin.x, bin.y) < 55
+            },
+            () => { this.scene.launch('Shop', { coins: this.coins }); this.scene.bringToTop('Shop'); }
         );
-        if (nearBinObj) {
+
+        this.checkHutEntry(
+            this.costumeHut, this.costumeHutState,
+            () => {
+                const ownedCostumes: string[] = this.registry.get('ownedCostumes') ?? [DEFAULT_COSTUME_ID];
+                return ownedCostumes.length > 1 || COSTUMES.some(c => !ownedCostumes.includes(c.id) && this.coins >= c.cost);
+            },
+            () => { this.scene.launch('CostumeShop', { coins: this.coins }); this.scene.bringToTop('CostumeShop'); }
+        );
+
+        this.checkHutEntry(
+            this.depotHut, this.depotHutState,
+            () => this.basket.some(item => item.resourceType !== 'trash'),
+            () => { this.scene.launch('Depot', { basket: this.basket, coins: this.coins, score: this.score }); this.scene.bringToTop('Depot'); }
+        );
+
+        // Trash bin — multiple bins, no cooldown, no timer pause needed
+        const nearBin = this.trashBins.find(bin =>
+            Phaser.Math.Distance.Between(this.player.x, this.player.y, bin.x, bin.y) < HUT_ENTRY_RADIUS
+        );
+        if (nearBin) {
             if (!this.binEntered) {
                 this.binEntered = true;
                 const hasAnyTrash = this.trashBag.length > 0 || this.basket.some(i => i.resourceType === 'trash');
@@ -832,109 +836,74 @@ export class GameScene extends Phaser.Scene {
         } else {
             this.binEntered = false;
         }
+    }
 
-        // Spoil check — remove expired basket items
-        const now = this.time.now;
+    private updateItemExpiration(now: number): void {
         const expired = this.basket.filter(item => item.spoilAt <= now);
-        if (expired.length > 0) {
-            expired.forEach(item => {
-                const i = this.basket.indexOf(item);
-                const img = this.basketSlotImages[i];
-                if (img?.visible) this.playDisintegration(80 + i * 44, 575, img.texture.key);
-            });
-            this.basket = this.basket.filter(item => item.spoilAt > now);
-            this.updateBasketUI();
-        }
+        if (expired.length === 0) return;
+        expired.forEach(item => {
+            const i = this.basket.indexOf(item);
+            const img = this.basketSlotImages[i];
+            if (img?.visible) this.playDisintegration(80 + i * 44, 575, img.texture.key);
+        });
+        this.basket = this.basket.filter(item => item.spoilAt > now);
+        this.updateBasketUI();
+    }
 
-        // Check collection by distance
+    private updateCollections(now: number): void {
         const r = this.player.collectionRadius;
-        const collected: Resource[] = [];
         const basketFull = this.basket.length >= this.basketCapacity;
         let nearResourceWhileFull = false;
+
+        const collected: Resource[] = [];
         this.resources.forEach((resource) => {
             if (!resource.active) return;
-            const dist = Phaser.Math.Distance.Between(
-                this.player.x, this.player.y,
-                resource.x, resource.y
-            );
-            if (dist <= r && basketFull) {
-                nearResourceWhileFull = true;
-                return;
-            }
-            if (dist <= r && !basketFull) {
-                this.basket.push({ points: resource.points, spoilAt: now + BASKET_SPOIL_TIME, resourceType: resource.resourceType, textureKey: resource.texture.key });
-                this.updateBasketUI();
-                this.flyToBasket(resource.texture.key, resource.x, resource.y);
-                resource.collect();
-                collected.push(resource);
-            }
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, resource.x, resource.y);
+            if (dist > r) return;
+            if (basketFull) { nearResourceWhileFull = true; return; }
+            this.basket.push({ points: resource.points, spoilAt: now + BASKET_SPOIL_TIME, resourceType: resource.resourceType, textureKey: resource.texture.key });
+            this.updateBasketUI();
+            this.flyToBasket(resource.texture.key, resource.x, resource.y);
+            resource.collect();
+            collected.push(resource);
         });
-        if (collected.length > 0) {
-            this.resources = this.resources.filter(r => !collected.includes(r));
-        }
+        if (collected.length > 0) this.resources = this.resources.filter(r => !collected.includes(r));
 
-        // Collect trash by proximity
         const collectedTrash: Trash[] = [];
         this.trashes.forEach((trash) => {
             if (!trash.active) return;
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, trash.x, trash.y);
-            if (dist <= r) {
-                if (this.trashBagCapacity > 0 && this.trashBag.length < this.trashBagCapacity) {
-                    this.trashBag.push(trash.texture.key);
-                    this.updateTrashBagUI();
-                    this.flyToTrashBag(trash.texture.key, trash.x, trash.y);
-                } else if (this.basket.length < this.basketCapacity) {
-                    this.basket.push({ points: 0, spoilAt: Infinity, resourceType: 'trash', textureKey: trash.texture.key });
-                    this.updateBasketUI();
-                    this.flyToBasket(trash.texture.key, trash.x, trash.y);
-                } else {
-                    // Both full — shake both icons
-                    if (this.time.now - this.lastTrashBagFullWarning > 2000) {
-                        this.lastTrashBagFullWarning = this.time.now;
-                        const shakeIcon = (target: Phaser.GameObjects.Text) => {
-                            const origX = target.x;
-                            this.tweens.add({
-                                targets: target,
-                                x: origX + 10,
-                                duration: 55,
-                                yoyo: true,
-                                repeat: 3,
-                                ease: 'Sine.inOut',
-                                onComplete: () => target.setX(origX)
-                            });
-                        };
-                        if (this.trashBagCapacity > 0) shakeIcon(this.trashBagText);
-                        shakeIcon(this.basketText);
-                    }
-                    return;
+            if (dist > r) return;
+            if (this.trashBagCapacity > 0 && this.trashBag.length < this.trashBagCapacity) {
+                this.trashBag.push(trash.texture.key);
+                this.updateTrashBagUI();
+                this.flyToTrashBag(trash.texture.key, trash.x, trash.y);
+            } else if (this.basket.length < this.basketCapacity) {
+                this.basket.push({ points: 0, spoilAt: Infinity, resourceType: 'trash', textureKey: trash.texture.key });
+                this.updateBasketUI();
+                this.flyToBasket(trash.texture.key, trash.x, trash.y);
+            } else {
+                // Both full — shake both icons
+                if (this.time.now - this.lastTrashBagFullWarning > 2000) {
+                    this.lastTrashBagFullWarning = this.time.now;
+                    const shakeIcon = (target: Phaser.GameObjects.Text) => {
+                        const origX = target.x;
+                        this.tweens.add({ targets: target, x: origX + 10, duration: 55, yoyo: true, repeat: 3, ease: 'Sine.inOut', onComplete: () => target.setX(origX) });
+                    };
+                    if (this.trashBagCapacity > 0) shakeIcon(this.trashBagText);
+                    shakeIcon(this.basketText);
                 }
-                trash.collect();
-                collectedTrash.push(trash);
+                return;
             }
+            trash.collect();
+            collectedTrash.push(trash);
         });
-        if (collectedTrash.length > 0) {
-            this.trashes = this.trashes.filter(t => !collectedTrash.includes(t));
-        }
-
-        // Draw freshness bars
-        this.drawFreshnessBars(now);
-
+        if (collectedTrash.length > 0) this.trashes = this.trashes.filter(t => !collectedTrash.includes(t));
 
         if (nearResourceWhileFull && this.time.now - this.lastBasketFullWarning > 2000) {
             this.lastBasketFullWarning = this.time.now;
             const origX = this.basketText.x;
-            this.tweens.add({
-                targets: this.basketText,
-                x: origX + 10,
-                duration: 55,
-                yoyo: true,
-                repeat: 3,
-                ease: 'Sine.inOut',
-                onComplete: () => this.basketText.setX(origX)
-            });
+            this.tweens.add({ targets: this.basketText, x: origX + 10, duration: 55, yoyo: true, repeat: 3, ease: 'Sine.inOut', onComplete: () => this.basketText.setX(origX) });
         }
-
-        this.updateBasketBounce();
-        this.updateBuildingTints();
     }
 }
