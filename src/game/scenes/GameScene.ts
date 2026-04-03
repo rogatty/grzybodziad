@@ -293,10 +293,10 @@ export class GameScene extends Phaser.Scene {
             this.trashSpawnTimer.paused = false;
         });
 
-        // Camera setup: main camera follows player, UI camera fixed
+        // Camera setup: static camera centered on world center, UI camera fixed
         this.cameras.main.setZoom(CAMERA_INITIAL_ZOOM);
         this.cameras.main.setBounds(zone0.x, zone0.y, zone0.w, zone0.h);
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
         this.cameras.main.setBackgroundColor('#6abf5e');
         this.uiCamera = this.cameras.add(0, 0, width, height);
 
@@ -382,8 +382,8 @@ export class GameScene extends Phaser.Scene {
     private getZoneBounds(stage: number): { x: number; y: number; w: number; h: number } {
         const cx = WORLD_WIDTH / 2;
         const cy = WORLD_HEIGHT / 2;
-        const w = Math.round(800 * Math.pow(1.5, stage));
-        const h = Math.round(600 * Math.pow(1.5, stage));
+        const w = Math.round(this.scale.width * Math.pow(1.5, stage));
+        const h = Math.round(this.scale.height * Math.pow(1.5, stage));
         return { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h };
     }
 
