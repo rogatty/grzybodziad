@@ -295,8 +295,8 @@ export class GameScene extends Phaser.Scene {
 
         // Camera setup: main camera follows player, UI camera fixed
         this.cameras.main.setZoom(CAMERA_INITIAL_ZOOM);
-        this.cameras.main.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
         this.cameras.main.setBounds(zone0.x, zone0.y, zone0.w, zone0.h);
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
         this.cameras.main.setBackgroundColor('#6abf5e');
         this.uiCamera = this.cameras.add(0, 0, width, height);
 

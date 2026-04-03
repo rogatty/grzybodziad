@@ -12,5 +12,9 @@
         </div>
         <div id="game-container"></div>
         <script type="module" src="/src/main.ts"></script>
+        <script>
+            // Reload when device rotates to landscape so Phaser re-creates UI at correct dimensions
+            window.matchMedia('(orientation: landscape)').addEventListener('change', function() { location.reload(); });
+        </script>
     </body>
 </html>
