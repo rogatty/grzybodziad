@@ -17,7 +17,7 @@ export function StartGame(containerId: string): Phaser.Game {
         parent: containerId,
         backgroundColor: '#2d5a27',
         scale: {
-            mode: Phaser.Scale.FIT,
+            mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
         },
         physics: {

@@ -52,6 +52,8 @@ export class GameScene extends Phaser.Scene {
     private freshnessGraphics!: Phaser.GameObjects.Graphics;
     private basketSlotImages: Phaser.GameObjects.Image[] = [];
     private trashSlotImages: Phaser.GameObjects.Image[] = [];
+    private basketRowY: number = 0;
+    private trashRowY: number = 0;
 
     private lastBasketFullWarning = 0;
     private lastTrashBagFullWarning = 0;
@@ -123,6 +125,8 @@ export class GameScene extends Phaser.Scene {
 
     create(): void {
         const { width, height } = this.scale;
+        this.basketRowY = height - 25;
+        this.trashRowY  = height - 70;
 
         // Background — tiled across the full world
         this.bgImage = this.add.tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH, WORLD_HEIGHT, 'background');
@@ -156,7 +160,7 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setOrigin(1, 0).setDepth(20);
 
-        this.basketText = this.add.text(12, 575, '🧺', {
+        this.basketText = this.add.text(12, this.basketRowY, '🧺', {
             fontSize: '26px',
             fontFamily: 'Arial, sans-serif',
             color: '#ffcc44',
@@ -172,7 +176,7 @@ export class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setDepth(20);
 
-        this.trashBagText = this.add.text(12, 530, '🗑', {
+        this.trashBagText = this.add.text(12, this.trashRowY, '🗑', {
             fontSize: '26px',
             fontFamily: 'Arial, sans-serif',
             color: '#88cc88',
@@ -185,7 +189,7 @@ export class GameScene extends Phaser.Scene {
         // Pre-allocate basket slot images (max capacity = 5 + 4*3 = 17)
         this.basketSlotImages = [];
         for (let i = 0; i < 17; i++) {
-            const img = this.add.image(80 + i * 44, 575, 'mushroom1')
+            const img = this.add.image(80 + i * 44, this.basketRowY, 'mushroom1')
                 .setDisplaySize(36, 36)
                 .setDepth(21)
                 .setVisible(false);
@@ -195,7 +199,7 @@ export class GameScene extends Phaser.Scene {
         // Pre-allocate trash bag slot images (max capacity = 4*3 = 12)
         this.trashSlotImages = [];
         for (let i = 0; i < 12; i++) {
-            const img = this.add.image(80 + i * 44, 530, 'trash_banana')
+            const img = this.add.image(80 + i * 44, this.trashRowY, 'trash_banana')
                 .setDisplaySize(36, 36)
                 .setDepth(21)
                 .setVisible(false);
@@ -599,12 +603,12 @@ export class GameScene extends Phaser.Scene {
 
     private flyToBasket(textureKey: string, worldX: number, worldY: number): void {
         const slot = Math.min(this.basket.length - 1, 16);
-        this.flyToUI(textureKey, worldX, worldY, 80 + slot * 44, 575);
+        this.flyToUI(textureKey, worldX, worldY, 80 + slot * 44, this.basketRowY);
     }
 
     private flyToTrashBag(textureKey: string, worldX: number, worldY: number): void {
         const slot = Math.min(this.trashBag.length - 1, 11);
-        this.flyToUI(textureKey, worldX, worldY, 80 + slot * 44, 530);
+        this.flyToUI(textureKey, worldX, worldY, 80 + slot * 44, this.trashRowY);
     }
 
     private endRound(): void {
@@ -634,7 +638,7 @@ export class GameScene extends Phaser.Scene {
     private updateBasketBounce(): void {
         const now = this.time.now;
         const BOUNCE_START = 6000;
-        const BASE_Y = 575;
+        const BASE_Y = this.basketRowY;
         for (let i = 0; i < this.basketSlotImages.length; i++) {
             const img = this.basketSlotImages[i];
             if (!img.visible || i >= this.basket.length) { img.y = BASE_Y; continue; }
@@ -670,14 +674,14 @@ export class GameScene extends Phaser.Scene {
         const slotSize = 36;
         const slotStep = 44;
         const slotsStartX = 80;
-        const basketY = 575;
-        const trashY = 530;
+        const basketY = this.basketRowY;
+        const trashY = this.trashRowY;
         const hasBag = this.trashBagCapacity > 0;
-        const panelTop = hasBag ? 506 : 551;
+        const panelTop = hasBag ? this.trashRowY - 24 : this.basketRowY - 24;
 
         // Panel background
         this.freshnessGraphics.fillStyle(0x000000, 0.45);
-        this.freshnessGraphics.fillRect(0, panelTop, this.scale.width, 600 - panelTop);
+        this.freshnessGraphics.fillRect(0, panelTop, this.scale.width, this.scale.height - panelTop);
 
         // Basket slots
         for (let i = 0; i < this.basketCapacity; i++) {
@@ -844,7 +848,7 @@ export class GameScene extends Phaser.Scene {
         expired.forEach(item => {
             const i = this.basket.indexOf(item);
             const img = this.basketSlotImages[i];
-            if (img?.visible) this.playDisintegration(80 + i * 44, 575, img.texture.key);
+            if (img?.visible) this.playDisintegration(80 + i * 44, this.basketRowY, img.texture.key);
         });
         this.basket = this.basket.filter(item => item.spoilAt > now);
         this.updateBasketUI();
