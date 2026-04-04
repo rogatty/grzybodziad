@@ -396,6 +396,10 @@ export class GameScene extends Phaser.Scene {
         // UI camera ignores all game world objects (fog stays visible in UI camera)
         this.uiCamera.ignore([this.bgImage, this.player, this.hut, this.costumeHut, this.depotHut]);
 
+        // Reposition all UI elements when the canvas resizes (e.g. on fullscreen toggle)
+        this.scale.on('resize', this.onResize, this);
+        this.events.once('shutdown', () => this.scale.off('resize', this.onResize, this));
+
         // Add first bin after cameras are set up (so uiCamera.ignore works)
         this.addTrashBin(0);
 
@@ -463,6 +467,35 @@ export class GameScene extends Phaser.Scene {
         ctx.restore();
 
         this.textures.addCanvas(key, canvas);
+    }
+
+    private onResize(gameSize: Phaser.Structs.Size): void {
+        const { width, height } = gameSize;
+
+        this.basketRowY = height - 25;
+        this.trashRowY  = height - 70;
+
+        this.timerText.setX(width - 16);
+        this.recipeCard.setX(width - 8);
+
+        this.basketText.setY(this.basketRowY);
+        this.trashBagText.setY(this.trashRowY);
+
+        for (let i = 0; i < this.basketSlotImages.length; i++) {
+            this.basketSlotImages[i].setY(this.basketRowY);
+            this.basketPriceLabels[i].setPosition(80 + i * 44 + 14, this.basketRowY + 10);
+        }
+        for (let i = 0; i < this.trashSlotImages.length; i++) {
+            this.trashSlotImages[i].setY(this.trashRowY);
+        }
+
+        // Regenerate fog overlay at new size and reposition
+        this.createFogOverlay();
+        this.fogOverlay.setTexture('fog_overlay');
+        this.fogOverlay.setPosition(width / 2, height / 2);
+
+        // Resize UI camera to match new viewport
+        this.uiCamera.setViewport(0, 0, width, height);
     }
 
     private getZoneBounds(stage: number): { x: number; y: number; w: number; h: number } {
