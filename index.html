@@ -17,10 +17,11 @@
             window.matchMedia('(orientation: landscape)').addEventListener('change', function() { location.reload(); });
 
             // Fullscreen on first tap (mobile only).
-            // Uses capture phase on document so it fires BEFORE Phaser's canvas listeners
-            // (Phaser calls stopPropagation, which would kill a bubbling listener on game-container).
+            // - capture:true fires before Phaser's listeners (Phaser calls stopPropagation)
+            // - pointerup instead of pointerdown: Phaser docs explicitly say pointerdown
+            //   fails on Android/iOS because the audio context unlock consumes the gesture first
             if ('ontouchstart' in window && document.documentElement.requestFullscreen) {
-                document.addEventListener('pointerdown', function() {
+                document.addEventListener('pointerup', function() {
                     document.documentElement.requestFullscreen().catch(function() {});
                 }, { once: true, capture: true });
             }

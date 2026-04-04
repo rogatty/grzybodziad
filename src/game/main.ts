@@ -15,6 +15,7 @@ export function StartGame(containerId: string): Phaser.Game {
         width: 800,
         height: 600,
         parent: containerId,
+        fullscreenTarget: containerId,
         backgroundColor: '#2d5a27',
         scale: {
             mode: Phaser.Scale.RESIZE,
