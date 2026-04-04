@@ -17,13 +17,12 @@
             window.matchMedia('(orientation: landscape)').addEventListener('change', function() { location.reload(); });
 
             // Fullscreen on first tap (mobile only).
-            // Must use a native DOM listener — Phaser queues input events one frame later,
-            // which causes browsers to reject requestFullscreen() as outside a user gesture.
+            // Uses capture phase on document so it fires BEFORE Phaser's canvas listeners
+            // (Phaser calls stopPropagation, which would kill a bubbling listener on game-container).
             if ('ontouchstart' in window && document.documentElement.requestFullscreen) {
-                document.getElementById('game-container').addEventListener('pointerdown', function fs() {
+                document.addEventListener('pointerdown', function() {
                     document.documentElement.requestFullscreen().catch(function() {});
-                    document.getElementById('game-container').removeEventListener('pointerdown', fs);
-                });
+                }, { once: true, capture: true });
             }
         </script>
     </body>
