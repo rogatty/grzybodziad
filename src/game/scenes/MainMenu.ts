@@ -41,8 +41,8 @@ export class MainMenu extends Phaser.Scene {
         playBtn.on('pointerout', () => playBtn.setStyle({ backgroundColor: '#227722' }));
         const startGame = () => {
             this.registry.set('roundDuration', 180);
-            if (isMobile()) {
-                document.documentElement.requestFullscreen?.().catch(() => {});
+            if (isMobile() && this.scale.fullscreen.available) {
+                this.scale.startFullscreen();
             }
             this.scene.start('GameScene');
         };
