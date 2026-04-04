@@ -24,8 +24,11 @@ import {
     BUILDING_SPAWN_CLEARANCE,
     BIN_SPACING,
     FOG_TRANSITION_START,
-    FOG_SAFE_MARGIN
+    FOG_SAFE_MARGIN,
+    getFreshnessMultiplier,
+    RESOURCE_POINTS
 } from '../data/constants';
+import { Recipe, pickRandomRecipe } from '../data/recipes';
 import { BasketItem } from '../data/types';
 import { UPGRADES, upgradeCost } from '../data/upgrades';
 import { COSTUMES, DEFAULT_COSTUME_ID } from '../data/costumes';
@@ -55,6 +58,20 @@ export class GameScene extends Phaser.Scene {
 
     private lastBasketFullWarning = 0;
     private lastTrashBagFullWarning = 0;
+
+    // Price labels on basket slots (one per slot)
+    private basketPriceLabels: Phaser.GameObjects.Text[] = [];
+
+    // Recipe card UI
+    private currentRecipe: Recipe | null = null;
+    private recipeCard!: Phaser.GameObjects.Container;
+    private recipeCardBg!: Phaser.GameObjects.Rectangle;
+    private recipeNameText!: Phaser.GameObjects.Text;
+    private recipeIngredientImages: Phaser.GameObjects.Image[] = [];
+    private recipeIngredientTexts: Phaser.GameObjects.Text[] = [];
+    private readonly ingredientTextureKeys: Record<string, string> = {
+        mushroom: 'mushroom1', berry: 'berry', flower: 'flower1'
+    };
 
     private hut!: Phaser.GameObjects.Image;
     private hutState = { entered: false, onCooldown: false };
@@ -103,9 +120,10 @@ export class GameScene extends Phaser.Scene {
         // Shuffle quadrants so each game puts bins in different corners
         this.binQuadrants = Phaser.Utils.Array.Shuffle([0, 1, 2, 3]);
 
-        // Reset upgrades each round
+        // Reset upgrades and recipe each round
         this.registry.set('upgradeLevels', {});
         this.registry.set('sellSpeedLevel', 0);
+        this.registry.set('currentRecipe', undefined);
 
         // Read upgrades from registry (set by Shop scene)
         const upgradeLevels: Record<string, number> = this.registry.get('upgradeLevels') ?? {};
@@ -200,6 +218,19 @@ export class GameScene extends Phaser.Scene {
             this.basketSlotImages.push(img);
         }
 
+        // Pre-allocate price label texts (one per basket slot)
+        this.basketPriceLabels = [];
+        for (let i = 0; i < 17; i++) {
+            const lbl = this.add.text(80 + i * 44 + 14, this.basketRowY + 10, '', {
+                fontSize: '11px',
+                fontFamily: 'Arial Black, sans-serif',
+                color: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 2
+            }).setOrigin(1, 0.5).setDepth(23).setVisible(false);
+            this.basketPriceLabels.push(lbl);
+        }
+
         // Pre-allocate trash bag slot images (max capacity = 4*3 = 12)
         this.trashSlotImages = [];
         for (let i = 0; i < 12; i++) {
@@ -209,6 +240,53 @@ export class GameScene extends Phaser.Scene {
                 .setVisible(false);
             this.trashSlotImages.push(img);
         }
+
+        // Recipe card — top-right, below timer
+        this.currentRecipe = (this.registry.get('currentRecipe') as Recipe | undefined) ?? pickRandomRecipe();
+        if (!this.registry.get('currentRecipe')) this.registry.set('currentRecipe', this.currentRecipe);
+
+        // Build recipe card container (fixed UI coords)
+        this.recipeCard = this.add.container(width - 8, 50).setDepth(20);
+        this.recipeCardBg = this.add.rectangle(0, 0, 180, 60, 0x000000, 0.5)
+            .setOrigin(1, 0)
+            .setStrokeStyle(1, 0xffdd44);
+        this.recipeNameText = this.add.text(-90, 6, '', {
+            fontSize: '13px',
+            fontFamily: 'Arial Black, sans-serif',
+            color: '#ffdd44',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5, 0);
+
+        this.recipeIngredientImages = [];
+        this.recipeIngredientTexts = [];
+
+        // Pre-allocate up to 3 ingredient slots
+        for (let i = 0; i < 3; i++) {
+            const imgX = -162 + i * 56;
+            const img = this.add.image(imgX, 36, this.ingredientTextureKeys['mushroom'])
+                .setDisplaySize(22, 22)
+                .setVisible(false);
+            this.recipeIngredientImages.push(img);
+
+            const txt = this.add.text(imgX + 12, 28, '', {
+                fontSize: '11px',
+                fontFamily: 'Arial Black, sans-serif',
+                color: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 2
+            }).setOrigin(0, 0).setVisible(false);
+            this.recipeIngredientTexts.push(txt);
+        }
+
+        this.recipeCard.add([
+            this.recipeCardBg,
+            this.recipeNameText,
+            ...this.recipeIngredientImages,
+            ...this.recipeIngredientTexts
+        ]);
+
+        this.updateRecipeCard();
 
         // Hut (shop entrance) — near player start, same relative offset as before
         this.hut = this.add.image(this.worldWidth / 2 + 180, this.worldHeight / 2 - 120, 'hut').setDepth(5);
@@ -309,7 +387,7 @@ export class GameScene extends Phaser.Scene {
         this.fogOverlay = this.add.image(width / 2, height / 2, 'fog_overlay').setDepth(15);
 
         // Main camera ignores all UI elements (text + fog)
-        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay, ...this.basketSlotImages, ...this.trashSlotImages]);
+        this.cameras.main.ignore([this.scoreText, this.timerText, this.basketText, this.coinsText, this.trashBagText, this.freshnessGraphics, this.fogOverlay, ...this.basketSlotImages, ...this.trashSlotImages, ...this.basketPriceLabels, this.recipeCard]);
 
         // UI camera ignores all game world objects (fog stays visible in UI camera)
         this.uiCamera.ignore([this.bgImage, this.player, this.hut, this.costumeHut, this.depotHut]);
@@ -670,6 +748,52 @@ export class GameScene extends Phaser.Scene {
         }
         const full = this.basket.length >= this.basketCapacity;
         this.basketText.setColor(full ? '#ff4444' : '#ffcc44');
+        this.updateRecipeCard();
+    }
+
+    private updateRecipeCard(): void {
+        if (!this.currentRecipe) return;
+        const recipe = this.currentRecipe;
+
+        this.recipeNameText.setText(`📋 ${recipe.namePL}`);
+
+        // Count matching items in basket
+        const basketCounts: Record<string, number> = {};
+        this.basket.forEach(item => {
+            if (item.resourceType !== 'trash') {
+                basketCounts[item.resourceType] = (basketCounts[item.resourceType] ?? 0) + 1;
+            }
+        });
+
+        const ingredientTextureKeys = this.ingredientTextureKeys;
+
+        // Update ingredient slots
+        recipe.ingredients.forEach((ing, i) => {
+            if (i >= this.recipeIngredientImages.length) return;
+            const have = basketCounts[ing.type] ?? 0;
+            const done = have >= ing.count;
+
+            const img = this.recipeIngredientImages[i];
+            img.setTexture(ingredientTextureKeys[ing.type])
+                .setAlpha(done ? 1 : 0.5)
+                .setVisible(true);
+
+            const txt = this.recipeIngredientTexts[i];
+            txt.setText(done ? '✓' : `${have}/${ing.count}`)
+                .setStyle({ color: done ? '#44ff44' : '#ffffff' })
+                .setVisible(true);
+        });
+
+        // Hide unused slots
+        for (let i = recipe.ingredients.length; i < this.recipeIngredientImages.length; i++) {
+            this.recipeIngredientImages[i].setVisible(false);
+            this.recipeIngredientTexts[i].setVisible(false);
+        }
+
+        // Resize background to fit content
+        const cardWidth = Math.max(140, recipe.ingredients.length * 56 + 24);
+        this.recipeCardBg.setSize(cardWidth, 60);
+        this.recipeNameText.setX(-cardWidth / 2);
     }
 
     private drawFreshnessBars(now: number): void {
@@ -699,17 +823,29 @@ export class GameScene extends Phaser.Scene {
             this.freshnessGraphics.fillStyle(0x222222, 0.9);
             this.freshnessGraphics.fillRect(x, barY, slotSize, 4);
 
+            const lbl = this.basketPriceLabels[i];
             if (i < this.basket.length) {
-                if (this.basket[i].resourceType === 'trash') {
+                const item = this.basket[i];
+                if (item.resourceType === 'trash') {
                     this.freshnessGraphics.fillStyle(0x886633, 1);
                     this.freshnessGraphics.fillRect(x, barY, slotSize, 4);
+                    lbl.setVisible(false);
                 } else {
-                    const rem = (this.basket[i].spoilAt - now) / BASKET_SPOIL_TIME;
+                    const rem = (item.spoilAt - now) / BASKET_SPOIL_TIME;
                     const fill = Math.max(0, Math.min(1, rem));
                     const color = fill > 0.5 ? 0x44dd44 : fill > 0.25 ? 0xffdd00 : 0xff4444;
                     this.freshnessGraphics.fillStyle(color, 1);
                     this.freshnessGraphics.fillRect(x, barY, Math.round(slotSize * fill), 4);
+
+                    const multiplier = getFreshnessMultiplier(item.spoilAt, now);
+                    const coinValue = item.points * multiplier;
+                    const textColor = fill > 0.5 ? '#44ff44' : fill > 0.25 ? '#ffdd00' : '#ff6666';
+                    lbl.setText(`${coinValue}💵`)
+                        .setStyle({ color: textColor, stroke: '#000000', strokeThickness: 2 })
+                        .setVisible(true);
                 }
+            } else {
+                lbl.setVisible(false);
             }
         }
 

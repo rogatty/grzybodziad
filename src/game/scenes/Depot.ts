@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { ResourceType, BASKET_BASE_CAPACITY } from '../data/constants';
+import { ResourceType, BASKET_BASE_CAPACITY, getFreshnessMultiplier } from '../data/constants';
 import { BasketItem } from '../data/types';
 import { UPGRADES } from '../data/upgrades';
 import { DEBUG_FILL_BASKET } from '../data/debug';
 import { ModalScene } from './ModalScene';
 import { isMobile } from '../utils';
+import { Recipe, pickRandomRecipe } from '../data/recipes';
 
 interface DepotData {
     basket: BasketItem[];
@@ -23,6 +24,10 @@ export class Depot extends ModalScene {
     private sellBg!: Phaser.GameObjects.Rectangle;
     private sellLabel!: Phaser.GameObjects.Text;
 
+    // Recipe tracking
+    private currentRecipe: Recipe | null = null;
+    private soldInVisit: { type: ResourceType; count: number }[] = [];
+
     constructor() {
         super('Depot');
     }
@@ -32,6 +37,12 @@ export class Depot extends ModalScene {
         this.trashBasket = data.basket.filter(i => i.resourceType === 'trash');
         this.coins = data.coins ?? 0;
         this.score = data.score ?? 0;
+        this.soldInVisit = [];
+
+        // Load current recipe from registry (or pick a new one)
+        const storedRecipe = this.registry.get('currentRecipe') as Recipe | undefined;
+        this.currentRecipe = storedRecipe ?? pickRandomRecipe();
+        if (!storedRecipe) this.registry.set('currentRecipe', this.currentRecipe);
 
         if (DEBUG_FILL_BASKET) {
             const basketUpgrade = UPGRADES.find(u => u.id === 'basket')!;
@@ -136,7 +147,17 @@ export class Depot extends ModalScene {
             const scale = Math.min(imgSize / img.width, (imgSize - 8) / img.height);
             img.setScale(scale);
 
-            const pts = this.add.text(x, y + size / 2 - 9, isTrash ? '🗑' : `${item.points}💵`, {
+            let priceLabel: string;
+            if (isTrash) {
+                priceLabel = '🗑';
+            } else if (fresh) {
+                const multiplier = getFreshnessMultiplier(item.spoilAt, this.time.now);
+                const adjustedPoints = item.points * multiplier;
+                priceLabel = `${adjustedPoints}💵`;
+            } else {
+                priceLabel = `0💵`;
+            }
+            const pts = this.add.text(x, y + size / 2 - 9, priceLabel, {
                 fontSize: '11px',
                 fontFamily: 'Arial Black, sans-serif',
                 color: isTrash ? '#aa3300' : (fresh ? '#553300' : '#888888'),
@@ -189,7 +210,8 @@ export class Depot extends ModalScene {
 
         let earned = 0;
         if (item.spoilAt > now) {
-            earned = item.points;
+            const multiplier = getFreshnessMultiplier(item.spoilAt, now);
+            earned = item.points * multiplier;
             this.score += earned;
         }
 
@@ -213,10 +235,63 @@ export class Depot extends ModalScene {
                 ease: 'Quad.out',
                 onComplete: () => popup.destroy()
             });
+
+            // Track sold item for recipe progress
+            if (item.resourceType !== 'trash') {
+                const existing = this.soldInVisit.find(s => s.type === item.resourceType);
+                if (existing) {
+                    existing.count++;
+                } else {
+                    this.soldInVisit.push({ type: item.resourceType as ResourceType, count: 1 });
+                }
+                this.checkRecipeCompletion();
+            }
         }
 
         this.refreshGrid();
         this.refreshSellButton();
+    }
+
+    private checkRecipeCompletion(): void {
+        if (!this.currentRecipe) return;
+        const fulfilled = this.currentRecipe.ingredients.every(ing => {
+            const sold = this.soldInVisit.find(s => s.type === ing.type);
+            return sold !== undefined && sold.count >= ing.count;
+        });
+        if (!fulfilled) return;
+
+        // Award bonus coins
+        const bonus = this.currentRecipe.bonusCoins;
+        this.coins += bonus;
+        this.score += bonus;
+        this.coinsText.setText(`💵 ${this.coins}`);
+
+        // Show celebration popup
+        const recipeName = this.currentRecipe.namePL;
+        const popup = this.add.text(this.scale.width / 2 - 80, this.scale.height / 2 - 20,
+            `Przepis gotowy!\n${recipeName} +${bonus} 💵`, {
+                fontSize: '26px',
+                fontFamily: 'Arial Black, sans-serif',
+                color: '#44ff44',
+                stroke: '#000000',
+                strokeThickness: 4,
+                align: 'center'
+            }).setOrigin(0.5).setDepth(60);
+        this.tweens.add({
+            targets: popup,
+            y: popup.y - 80,
+            alpha: 0,
+            duration: 1800,
+            ease: 'Quad.out',
+            onComplete: () => popup.destroy()
+        });
+
+        // Pick a new recipe and save to registry
+        const newRecipe = pickRandomRecipe(this.currentRecipe);
+        this.currentRecipe = newRecipe;
+        this.registry.set('currentRecipe', newRecipe);
+        // Reset sold tracker so next recipe can be completed fresh
+        this.soldInVisit = [];
     }
 
     private refreshSellButton(): void {

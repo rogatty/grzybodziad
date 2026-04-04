@@ -52,3 +52,11 @@ export const BIN_SPACING = 300;            // min distance between trash bins
 // Fog
 export const FOG_TRANSITION_START = 0.8;   // fog begins at this fraction of zone radius
 export const FOG_SAFE_MARGIN = 0.35;       // bins must be within this fraction of zone half-size
+
+// Returns how many coins 1 base-point is worth, based on remaining freshness
+export function getFreshnessMultiplier(spoilAt: number, now: number): number {
+    const remaining = (spoilAt - now) / BASKET_SPOIL_TIME;
+    if (remaining > 0.75) return 3;
+    if (remaining > 0.5) return 2;
+    return 1;
+}
