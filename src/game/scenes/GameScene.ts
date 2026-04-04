@@ -244,31 +244,30 @@ export class GameScene extends Phaser.Scene {
         this.currentRecipe = (this.registry.get('currentRecipe') as Recipe | undefined) ?? pickRandomRecipe();
         if (!this.registry.get('currentRecipe')) this.registry.set('currentRecipe', this.currentRecipe);
 
-        // Build recipe card container (fixed UI coords)
+        // Build recipe card container (fixed UI coords, right-aligned)
         this.recipeCard = this.add.container(width - 8, 50).setDepth(20);
-        this.recipeCardBg = this.add.rectangle(0, 0, 180, 60, 0x000000, 0.5)
+        this.recipeCardBg = this.add.rectangle(0, 0, 180, 56, 0x000000, 0.5)
             .setOrigin(1, 0)
             .setStrokeStyle(1, 0xffdd44);
-        this.recipeNameText = this.add.text(-90, 6, '', {
+        this.recipeNameText = this.add.text(0, 5, '', {
             fontSize: '13px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#ffdd44',
             stroke: '#000000',
             strokeThickness: 3
-        }).setOrigin(0.5, 0);
+        }).setOrigin(1, 0);
 
         this.recipeIngredientImages = [];
         this.recipeIngredientTexts = [];
 
-        // Pre-allocate up to 3 ingredient slots
+        // Pre-allocate up to 3 ingredient slots (positioned in updateRecipeCard)
         for (let i = 0; i < 3; i++) {
-            const imgX = -162 + i * 56;
-            const img = this.add.image(imgX, 36, this.ingredientTextureKeys['mushroom'])
+            const img = this.add.image(0, 34, this.ingredientTextureKeys['mushroom'])
                 .setDisplaySize(22, 22)
                 .setVisible(false);
             this.recipeIngredientImages.push(img);
 
-            const txt = this.add.text(imgX + 12, 28, '', {
+            const txt = this.add.text(0, 26, '', {
                 fontSize: '11px',
                 fontFamily: 'Arial Black, sans-serif',
                 color: '#ffffff',
@@ -771,34 +770,42 @@ export class GameScene extends Phaser.Scene {
         });
 
         const ingredientTextureKeys = this.ingredientTextureKeys;
+        const slotW = 46; // width per ingredient slot
+        const numIng = recipe.ingredients.length;
+        const cardWidth = Math.max(this.recipeNameText.width + 16, numIng * slotW + 16);
 
-        // Update ingredient slots
+        // Position ingredients right-aligned inside the card
+        // Card spans from -cardWidth to 0 (right-aligned at x=0)
+        const startX = -cardWidth + 12;
+
         recipe.ingredients.forEach((ing, i) => {
             if (i >= this.recipeIngredientImages.length) return;
             const have = basketCounts[ing.type] ?? 0;
             const done = have >= ing.count;
+            const x = startX + i * slotW;
 
             const img = this.recipeIngredientImages[i];
             img.setTexture(ingredientTextureKeys[ing.type])
+                .setPosition(x, 34)
                 .setAlpha(done ? 1 : 0.5)
                 .setVisible(true);
 
             const txt = this.recipeIngredientTexts[i];
             txt.setText(done ? '✓' : `${have}/${ing.count}`)
+                .setPosition(x + 12, 26)
                 .setStyle({ color: done ? '#44ff44' : '#ffffff' })
                 .setVisible(true);
         });
 
         // Hide unused slots
-        for (let i = recipe.ingredients.length; i < this.recipeIngredientImages.length; i++) {
+        for (let i = numIng; i < this.recipeIngredientImages.length; i++) {
             this.recipeIngredientImages[i].setVisible(false);
             this.recipeIngredientTexts[i].setVisible(false);
         }
 
-        // Resize background to fit content
-        const cardWidth = Math.max(140, recipe.ingredients.length * 56 + 24);
-        this.recipeCardBg.setSize(cardWidth, 60);
-        this.recipeNameText.setX(-cardWidth / 2);
+        // Resize background and reposition title
+        this.recipeCardBg.setSize(cardWidth, 56);
+        this.recipeNameText.setX(-4);
     }
 
     private drawFreshnessBars(now: number): void {
