@@ -333,6 +333,12 @@ export class GameScene extends Phaser.Scene {
                     this.score = data.score;
                     this.scoreText.setText(`🏆 ${this.score}`);
                 }
+                // Re-read recipe from registry (Depot may have completed one and picked a new one)
+                const updatedRecipe = this.registry.get('currentRecipe') as Recipe | undefined;
+                if (updatedRecipe) {
+                    this.currentRecipe = updatedRecipe;
+                    this.updateRecipeCard();
+                }
                 this.depotHutState.entered = true;
                 this.depotHutState.onCooldown = true;
             } else if (data?.costume !== undefined) {
