@@ -15,6 +15,16 @@
         <script>
             // Reload when device rotates to landscape so Phaser re-creates UI at correct dimensions
             window.matchMedia('(orientation: landscape)').addEventListener('change', function() { location.reload(); });
+
+            // Fullscreen on first tap (mobile only).
+            // Must use a native DOM listener — Phaser queues input events one frame later,
+            // which causes browsers to reject requestFullscreen() as outside a user gesture.
+            if ('ontouchstart' in window && document.documentElement.requestFullscreen) {
+                document.getElementById('game-container').addEventListener('pointerdown', function fs() {
+                    document.documentElement.requestFullscreen().catch(function() {});
+                    document.getElementById('game-container').removeEventListener('pointerdown', fs);
+                });
+            }
         </script>
     </body>
 </html>
