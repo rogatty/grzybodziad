@@ -219,28 +219,33 @@ export class Depot extends ModalScene {
     private claimRecipe(): void {
         if (!this.currentRecipe || !this.isRecipeFulfilled()) return;
 
-        // Remove recipe ingredients from basket (consume them)
+        // Auto-sell recipe ingredients at their current freshness price
         const now = this.time.now;
+        let sellEarned = 0;
         for (const ing of this.currentRecipe.ingredients) {
             let remaining = ing.count;
             for (let i = this.basket.length - 1; i >= 0 && remaining > 0; i--) {
                 const item = this.basket[i];
                 if (item.resourceType === ing.type && item.spoilAt > now) {
+                    const multiplier = getFreshnessMultiplier(item.spoilAt, now);
+                    sellEarned += item.points * multiplier;
                     this.basket.splice(i, 1);
                     remaining--;
                 }
             }
         }
 
+        // Award sell value + recipe bonus
         const bonus = this.currentRecipe.bonusCoins;
-        this.coins += bonus;
-        this.score += bonus;
+        const total = sellEarned + bonus;
+        this.coins += total;
+        this.score += total;
         this.coinsText.setText(`💵 ${this.coins}`);
 
         // Celebration popup
         const recipeName = this.currentRecipe.namePL;
         const popup = this.add.text(this.scale.width / 2 - 80, this.scale.height / 2 - 20,
-            `📋 ${recipeName}\n+${bonus} 💵`, {
+            `📋 ${recipeName}\n+${sellEarned} 💵 +${bonus} bonus!`, {
                 fontSize: '26px', fontFamily: 'Arial Black, sans-serif',
                 color: '#44ff44', stroke: '#000000', strokeThickness: 4, align: 'center'
             }).setOrigin(0.5).setDepth(60);
