@@ -25,8 +25,7 @@ import {
     BIN_SPACING,
     FOG_TRANSITION_START,
     FOG_SAFE_MARGIN,
-    getFreshnessMultiplier,
-    RESOURCE_POINTS
+    getFreshnessMultiplier
 } from '../data/constants';
 import { Recipe, pickRandomRecipe } from '../data/recipes';
 import { BasketItem } from '../data/types';
