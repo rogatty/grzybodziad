@@ -24,9 +24,11 @@ export class Depot extends ModalScene {
     private sellBg!: Phaser.GameObjects.Rectangle;
     private sellLabel!: Phaser.GameObjects.Text;
 
-    // Recipe tracking
+    // Recipe UI
     private currentRecipe: Recipe | null = null;
-    private soldInVisit: { type: ResourceType; count: number }[] = [];
+    private recipeCard!: Phaser.GameObjects.Container;
+    private claimBg!: Phaser.GameObjects.Rectangle;
+    private claimLabel!: Phaser.GameObjects.Text;
 
     constructor() {
         super('Depot');
@@ -37,7 +39,6 @@ export class Depot extends ModalScene {
         this.trashBasket = data.basket.filter(i => i.resourceType === 'trash');
         this.coins = data.coins ?? 0;
         this.score = data.score ?? 0;
-        this.soldInVisit = [];
 
         // Load current recipe from registry (or pick a new one)
         const storedRecipe = this.registry.get('currentRecipe') as Recipe | undefined;
@@ -68,17 +69,21 @@ export class Depot extends ModalScene {
             .setOrigin(0.5)
             .setDisplaySize(300, 460);
 
-        this.add.text(cx, height / 2 - 245, 'Dom Grzybodziada', {
+        this.add.text(cx, height / 2 - 255, 'Dom Grzybodziada', {
             fontSize: '32px',
             fontFamily: 'Arial Black, sans-serif',
             color: '#553300'
         }).setOrigin(0.5);
 
-        this.coinsText = this.add.text(cx, height / 2 - 207, `💵 ${this.coins}`, {
+        this.coinsText = this.add.text(cx, height / 2 - 220, `💵 ${this.coins}`, {
             fontSize: '20px',
             fontFamily: 'Arial, sans-serif',
             color: '#553300'
         }).setOrigin(0.5);
+
+        // Recipe card area
+        this.recipeCard = this.add.container(cx, height / 2 - 185);
+        this.add.existing(this.recipeCard);
 
         // Basket grid area
         this.basketGrid = this.add.container(cx, height / 2 - 100);
@@ -87,8 +92,16 @@ export class Depot extends ModalScene {
 
         // Buttons
         const BTN_W = 360, BTN_H = 52;
-        const sellY = height / 2 + 115;
-        const backY = height / 2 + 180;
+        const claimY = height / 2 + 75;
+        const sellY = height / 2 + 135;
+        const backY = height / 2 + 195;
+
+        // Claim button (hidden by default)
+        this.claimBg = this.add.rectangle(cx, claimY, BTN_W, BTN_H, 0xaa8800)
+            .setVisible(false);
+        this.claimLabel = this.add.text(cx, claimY, '', {
+            fontSize: '20px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
+        }).setOrigin(0.5).setVisible(false);
 
         this.sellBg = this.add.rectangle(cx, sellY, BTN_W, BTN_H, 0x336633);
         if (!isMobile()) this.add.image(cx - BTN_W / 2 + 55, sellY, 'key_space').setDisplaySize(52, 22);
@@ -116,6 +129,118 @@ export class Depot extends ModalScene {
             if (e.key === 'Escape') this.close();
             if (e.key === ' ' || e.key === 'Enter') this.sell();
         });
+
+        // Initial recipe UI refresh
+        this.refreshRecipeUI();
+    }
+
+    private getBasketRecipeCounts(): Record<string, number> {
+        const counts: Record<string, number> = {};
+        const now = this.time.now;
+        this.basket.forEach(item => {
+            if (item.resourceType !== 'trash' && item.spoilAt > now) {
+                counts[item.resourceType] = (counts[item.resourceType] ?? 0) + 1;
+            }
+        });
+        return counts;
+    }
+
+    private isRecipeFulfilled(): boolean {
+        if (!this.currentRecipe) return false;
+        const counts = this.getBasketRecipeCounts();
+        return this.currentRecipe.ingredients.every(ing => (counts[ing.type] ?? 0) >= ing.count);
+    }
+
+    private refreshRecipeUI(): void {
+        if (!this.recipeCard) return;
+        this.recipeCard.removeAll(true);
+
+        if (!this.currentRecipe) return;
+
+        const recipe = this.currentRecipe;
+        const counts = this.getBasketRecipeCounts();
+
+        // Recipe name
+        this.recipeCard.add(this.add.text(0, 0, `📋 ${recipe.namePL}`, {
+            fontSize: '16px',
+            fontFamily: 'Arial Black, sans-serif',
+            color: '#553300'
+        }).setOrigin(0.5));
+
+        // Ingredient row
+        const ingSpacing = 70;
+        const totalW = (recipe.ingredients.length - 1) * ingSpacing;
+        const startX = -totalW / 2;
+
+        const textureMap: Record<string, string> = {
+            mushroom: 'mushroom1',
+            berry: 'berry',
+            flower: 'flower1'
+        };
+
+        recipe.ingredients.forEach((ing, i) => {
+            const x = startX + i * ingSpacing;
+            const y = 30;
+            const have = counts[ing.type] ?? 0;
+            const fulfilled = have >= ing.count;
+
+            const imgKey = textureMap[ing.type] ?? ing.type;
+            const img = this.add.image(x, y, imgKey)
+                .setDisplaySize(24, 24)
+                .setAlpha(fulfilled ? 1 : 0.4);
+            this.recipeCard.add(img);
+
+            const label = fulfilled ? '✓' : `${have}/${ing.count}`;
+            const txt = this.add.text(x, y + 18, label, {
+                fontSize: '13px',
+                fontFamily: 'Arial Black, sans-serif',
+                color: fulfilled ? '#228822' : '#888888'
+            }).setOrigin(0.5);
+            this.recipeCard.add(txt);
+        });
+
+        // Show/hide claim button
+        const fulfilled = this.isRecipeFulfilled();
+        this.claimBg.setVisible(fulfilled);
+        this.claimLabel.setVisible(fulfilled);
+
+        if (fulfilled) {
+            this.claimLabel.setText(`📋 Odbierz bonus! +${recipe.bonusCoins}💵`);
+            this.claimBg.setInteractive({ useHandCursor: true });
+            this.claimBg.off('pointerover').off('pointerout').off('pointerdown');
+            this.claimBg.on('pointerover', () => this.claimBg.setFillStyle(0xddaa00));
+            this.claimBg.on('pointerout', () => this.claimBg.setFillStyle(0xaa8800));
+            this.claimBg.on('pointerdown', () => this.claimRecipe());
+        } else {
+            this.claimBg.disableInteractive();
+        }
+    }
+
+    private claimRecipe(): void {
+        if (!this.currentRecipe || !this.isRecipeFulfilled()) return;
+        const bonus = this.currentRecipe.bonusCoins;
+        this.coins += bonus;
+        this.score += bonus;
+        this.coinsText.setText(`💵 ${this.coins}`);
+
+        // Celebration popup
+        const recipeName = this.currentRecipe.namePL;
+        const popup = this.add.text(this.scale.width / 2 - 80, this.scale.height / 2 - 20,
+            `📋 ${recipeName}\n+${bonus} 💵`, {
+                fontSize: '26px', fontFamily: 'Arial Black, sans-serif',
+                color: '#44ff44', stroke: '#000000', strokeThickness: 4, align: 'center'
+            }).setOrigin(0.5).setDepth(60);
+        this.tweens.add({
+            targets: popup, y: popup.y - 80, alpha: 0,
+            duration: 1800, ease: 'Quad.out',
+            onComplete: () => popup.destroy()
+        });
+
+        // New recipe
+        const newRecipe = pickRandomRecipe(this.currentRecipe);
+        this.currentRecipe = newRecipe;
+        this.registry.set('currentRecipe', newRecipe);
+        this.refreshRecipeUI();
     }
 
     private refreshGrid(): void {
@@ -235,63 +360,11 @@ export class Depot extends ModalScene {
                 ease: 'Quad.out',
                 onComplete: () => popup.destroy()
             });
-
-            // Track sold item for recipe progress
-            if (item.resourceType !== 'trash') {
-                const existing = this.soldInVisit.find(s => s.type === item.resourceType);
-                if (existing) {
-                    existing.count++;
-                } else {
-                    this.soldInVisit.push({ type: item.resourceType as ResourceType, count: 1 });
-                }
-                this.checkRecipeCompletion();
-            }
         }
 
         this.refreshGrid();
         this.refreshSellButton();
-    }
-
-    private checkRecipeCompletion(): void {
-        if (!this.currentRecipe) return;
-        const fulfilled = this.currentRecipe.ingredients.every(ing => {
-            const sold = this.soldInVisit.find(s => s.type === ing.type);
-            return sold !== undefined && sold.count >= ing.count;
-        });
-        if (!fulfilled) return;
-
-        // Award bonus coins
-        const bonus = this.currentRecipe.bonusCoins;
-        this.coins += bonus;
-        this.score += bonus;
-        this.coinsText.setText(`💵 ${this.coins}`);
-
-        // Show celebration popup
-        const recipeName = this.currentRecipe.namePL;
-        const popup = this.add.text(this.scale.width / 2 - 80, this.scale.height / 2 - 20,
-            `Przepis gotowy!\n${recipeName} +${bonus} 💵`, {
-                fontSize: '26px',
-                fontFamily: 'Arial Black, sans-serif',
-                color: '#44ff44',
-                stroke: '#000000',
-                strokeThickness: 4,
-                align: 'center'
-            }).setOrigin(0.5).setDepth(60);
-        this.tweens.add({
-            targets: popup,
-            y: popup.y - 80,
-            alpha: 0,
-            duration: 1800,
-            ease: 'Quad.out',
-            onComplete: () => popup.destroy()
-        });
-
-        // Pick a new recipe and save to registry
-        const newRecipe = pickRandomRecipe(this.currentRecipe);
-        this.currentRecipe = newRecipe;
-        this.registry.set('currentRecipe', newRecipe);
-        // Reset sold tracker so next recipe can be completed fresh
-        this.soldInVisit = [];
+        this.refreshRecipeUI();
     }
 
     private refreshSellButton(): void {
