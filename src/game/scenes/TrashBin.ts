@@ -164,7 +164,7 @@ export class TrashBin extends ModalScene {
                     color: '#ffff00', stroke: '#000000', strokeThickness: 4
                 }).setOrigin(0.5).setDepth(50);
             this.tweens.add({
-                targets: popup, y: popup.y - 60, alpha: 0, duration: 700,
+                targets: popup, y: popup.y - 60, alpha: 0, duration: 2000,
                 ease: 'Quad.out', onComplete: () => popup.destroy()
             });
         }

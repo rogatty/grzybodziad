@@ -251,7 +251,7 @@ export class Depot extends ModalScene {
             }).setOrigin(0.5).setDepth(60);
         this.tweens.add({
             targets: popup, y: popup.y - 80, alpha: 0,
-            duration: 1800, ease: 'Quad.out',
+            duration: 3500, ease: 'Quad.out',
             onComplete: () => popup.destroy()
         });
 
@@ -340,7 +340,7 @@ export class Depot extends ModalScene {
             targets: popup,
             y: popup.y - 40,
             alpha: 0,
-            duration: 900,
+            duration: 2500,
             ease: 'Quad.out',
             onComplete: () => popup.destroy()
         });
@@ -377,7 +377,7 @@ export class Depot extends ModalScene {
                 targets: popup,
                 y: popup.y - 60,
                 alpha: 0,
-                duration: 700,
+                duration: 2000,
                 ease: 'Quad.out',
                 onComplete: () => popup.destroy()
             });
