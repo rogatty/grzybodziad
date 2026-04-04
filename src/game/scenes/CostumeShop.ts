@@ -1,6 +1,7 @@
 import { COSTUMES, DEFAULT_COSTUME_ID } from '../data/costumes';
 import { DEBUG_ALL_COSTUMES_OWNED } from '../data/debug';
 import { ModalScene } from './ModalScene';
+import { isMobile } from '../utils';
 
 interface CostumeShopData {
     coins: number;
@@ -58,8 +59,8 @@ export class CostumeShop extends ModalScene {
             const owned = this.ownedCostumes.includes(costume.id);
             const active = this.activeCostume === costume.id;
 
-            // Key badge
-            this.add.image(cx - 220, rowY, `key_${i + 1}`).setDisplaySize(28, 26);
+            // Key badge (keyboard only)
+            if (!isMobile()) this.add.image(cx - 220, rowY, `key_${i + 1}`).setDisplaySize(28, 26);
 
             // Small sprite preview
             if (costume.sprite) {
@@ -107,10 +108,12 @@ export class CostumeShop extends ModalScene {
         const BTN_W = 360, BTN_H = 52;
         const backBg = this.add.rectangle(cx, height / 2 + 245, BTN_W, BTN_H, 0x883300)
             .setInteractive({ useHandCursor: true });
-        this.add.image(cx - BTN_W / 2 + 55, height / 2 + 245, 'key_empty').setDisplaySize(28, 26);
-        this.add.text(cx - BTN_W / 2 + 55, height / 2 + 245, 'Esc', {
-            fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
-        }).setOrigin(0.5);
+        if (!isMobile()) {
+            this.add.image(cx - BTN_W / 2 + 55, height / 2 + 245, 'key_empty').setDisplaySize(28, 26);
+            this.add.text(cx - BTN_W / 2 + 55, height / 2 + 245, 'Esc', {
+                fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
+            }).setOrigin(0.5);
+        }
         this.add.text(cx + 15, height / 2 + 245, 'Wyjdź', {
             fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
         }).setOrigin(0.5);

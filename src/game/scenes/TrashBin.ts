@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TRASH_BASE_COINS } from '../data/constants';
 import { BasketItem } from '../data/types';
 import { ModalScene } from './ModalScene';
+import { isMobile } from '../utils';
 
 interface TrashBinData {
     trashBag: string[];
@@ -59,7 +60,7 @@ export class TrashBin extends ModalScene {
         const backY = height / 2 + 185;
 
         this.throwBg = this.add.rectangle(cx, throwY, BTN_W, BTN_H, 0x555555);
-        this.add.image(cx - BTN_W / 2 + 55, throwY, 'key_space').setDisplaySize(52, 22);
+        if (!isMobile()) this.add.image(cx - BTN_W / 2 + 55, throwY, 'key_space').setDisplaySize(52, 22);
         this.throwLabel = this.add.text(cx + 15, throwY, '', {
             fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
         }).setOrigin(0.5);
@@ -67,10 +68,12 @@ export class TrashBin extends ModalScene {
 
         const backBg = this.add.rectangle(cx, backY, BTN_W, BTN_H, 0x883300)
             .setInteractive({ useHandCursor: true });
-        this.add.image(cx - BTN_W / 2 + 55, backY, 'key_empty').setDisplaySize(28, 26);
-        this.add.text(cx - BTN_W / 2 + 55, backY, 'Esc', {
-            fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
-        }).setOrigin(0.5);
+        if (!isMobile()) {
+            this.add.image(cx - BTN_W / 2 + 55, backY, 'key_empty').setDisplaySize(28, 26);
+            this.add.text(cx - BTN_W / 2 + 55, backY, 'Esc', {
+                fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
+            }).setOrigin(0.5);
+        }
         this.add.text(cx + 15, backY, 'Wyjdź', {
             fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
         }).setOrigin(0.5);

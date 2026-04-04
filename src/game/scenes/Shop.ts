@@ -1,5 +1,6 @@
 import { UPGRADES, upgradeCost } from '../data/upgrades';
 import { ModalScene } from './ModalScene';
+import { isMobile } from '../utils';
 
 interface ShopData {
     coins: number;
@@ -60,8 +61,8 @@ export class Shop extends ModalScene {
         UPGRADES.forEach((upgrade, i) => {
             const rowY = height / 2 - 155 + i * 65;
 
-            // Key badge
-            this.add.image(width / 2 - 268, rowY, `key_${i + 1}`).setDisplaySize(28, 26);
+            // Key badge (keyboard only)
+            if (!isMobile()) this.add.image(width / 2 - 268, rowY, `key_${i + 1}`).setDisplaySize(28, 26);
 
             // Icon
             this.add.image(width / 2 - 228, rowY, upgradeIcons[i]).setDisplaySize(48, 48);
@@ -121,10 +122,12 @@ export class Shop extends ModalScene {
         const BTN_W = 360, BTN_H = 52;
         const backBg = this.add.rectangle(width / 2, height / 2 + 245, BTN_W, BTN_H, 0x883300)
             .setInteractive({ useHandCursor: true });
-        this.add.image(width / 2 - BTN_W / 2 + 55, height / 2 + 245, 'key_empty').setDisplaySize(28, 26);
-        this.add.text(width / 2 - BTN_W / 2 + 55, height / 2 + 245, 'Esc', {
-            fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
-        }).setOrigin(0.5);
+        if (!isMobile()) {
+            this.add.image(width / 2 - BTN_W / 2 + 55, height / 2 + 245, 'key_empty').setDisplaySize(28, 26);
+            this.add.text(width / 2 - BTN_W / 2 + 55, height / 2 + 245, 'Esc', {
+                fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
+            }).setOrigin(0.5);
+        }
         this.add.text(width / 2 + 15, height / 2 + 245, 'Wyjdź', {
             fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
         }).setOrigin(0.5);

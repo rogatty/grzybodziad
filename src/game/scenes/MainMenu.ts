@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isMobile } from '../utils';
 
 export class MainMenu extends Phaser.Scene {
     constructor() {
@@ -44,8 +45,8 @@ export class MainMenu extends Phaser.Scene {
         };
         playBtn.on('pointerdown', startGame);
 
-        // Space key hint below play button
-        this.add.image(width / 2, height / 2 + 120, 'key_space').setDisplaySize(100, 24);
+        // Space key hint below play button (keyboard only)
+        if (!isMobile()) this.add.image(width / 2, height / 2 + 120, 'key_space').setDisplaySize(100, 24);
 
         this.input.keyboard!.on('keydown-SPACE', startGame);
 

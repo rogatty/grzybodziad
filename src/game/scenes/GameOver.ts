@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isMobile } from '../utils';
 
 interface GameOverData {
     score: number;
@@ -47,7 +48,7 @@ export class GameOver extends Phaser.Scene {
         const btnY = height / 2 + 100;
         const playBg = this.add.rectangle(width / 2, btnY, BTN_W, BTN_H, 0x227722)
             .setInteractive({ useHandCursor: true });
-        this.add.image(width / 2 - BTN_W / 2 + 55, btnY, 'key_space').setDisplaySize(52, 22);
+        if (!isMobile()) this.add.image(width / 2 - BTN_W / 2 + 55, btnY, 'key_space').setDisplaySize(52, 22);
         this.add.text(width / 2 + 15, btnY, 'Jeszcze raz', {
             fontSize: '26px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
         }).setOrigin(0.5);

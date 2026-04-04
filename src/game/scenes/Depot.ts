@@ -4,6 +4,7 @@ import { BasketItem } from '../data/types';
 import { UPGRADES } from '../data/upgrades';
 import { DEBUG_FILL_BASKET } from '../data/debug';
 import { ModalScene } from './ModalScene';
+import { isMobile } from '../utils';
 
 interface DepotData {
     basket: BasketItem[];
@@ -79,7 +80,7 @@ export class Depot extends ModalScene {
         const backY = height / 2 + 180;
 
         this.sellBg = this.add.rectangle(cx, sellY, BTN_W, BTN_H, 0x336633);
-        this.add.image(cx - BTN_W / 2 + 55, sellY, 'key_space').setDisplaySize(52, 22);
+        if (!isMobile()) this.add.image(cx - BTN_W / 2 + 55, sellY, 'key_space').setDisplaySize(52, 22);
         this.sellLabel = this.add.text(cx + 15, sellY, '', {
             fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
         }).setOrigin(0.5);
@@ -87,10 +88,12 @@ export class Depot extends ModalScene {
 
         const backBg = this.add.rectangle(cx, backY, BTN_W, BTN_H, 0x883300)
             .setInteractive({ useHandCursor: true });
-        this.add.image(cx - BTN_W / 2 + 55, backY, 'key_empty').setDisplaySize(28, 26);
-        this.add.text(cx - BTN_W / 2 + 55, backY, 'Esc', {
-            fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
-        }).setOrigin(0.5);
+        if (!isMobile()) {
+            this.add.image(cx - BTN_W / 2 + 55, backY, 'key_empty').setDisplaySize(28, 26);
+            this.add.text(cx - BTN_W / 2 + 55, backY, 'Esc', {
+                fontSize: '7px', fontFamily: 'Arial Black, sans-serif', color: '#333333'
+            }).setOrigin(0.5);
+        }
         this.add.text(cx + 15, backY, 'Wyjdź', {
             fontSize: '22px', fontFamily: 'Arial Black, sans-serif', color: '#ffffff'
         }).setOrigin(0.5);
