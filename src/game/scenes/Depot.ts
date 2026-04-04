@@ -218,6 +218,20 @@ export class Depot extends ModalScene {
 
     private claimRecipe(): void {
         if (!this.currentRecipe || !this.isRecipeFulfilled()) return;
+
+        // Remove recipe ingredients from basket (consume them)
+        const now = this.time.now;
+        for (const ing of this.currentRecipe.ingredients) {
+            let remaining = ing.count;
+            for (let i = this.basket.length - 1; i >= 0 && remaining > 0; i--) {
+                const item = this.basket[i];
+                if (item.resourceType === ing.type && item.spoilAt > now) {
+                    this.basket.splice(i, 1);
+                    remaining--;
+                }
+            }
+        }
+
         const bonus = this.currentRecipe.bonusCoins;
         this.coins += bonus;
         this.score += bonus;
@@ -240,6 +254,8 @@ export class Depot extends ModalScene {
         const newRecipe = pickRandomRecipe(this.currentRecipe);
         this.currentRecipe = newRecipe;
         this.registry.set('currentRecipe', newRecipe);
+        this.refreshGrid();
+        this.refreshSellButton();
         this.refreshRecipeUI();
     }
 
