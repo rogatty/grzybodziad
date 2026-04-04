@@ -12,8 +12,6 @@ import {
     ResourceType,
     RESOURCE_NAMES_PL,
     CAMERA_INITIAL_ZOOM,
-    WORLD_WIDTH,
-    WORLD_HEIGHT,
     TRASH_SPAWN_INTERVAL,
     MAX_TRASH_ON_SCREEN,
     PLAYER_BASE_SPEED,
@@ -80,6 +78,8 @@ export class GameScene extends Phaser.Scene {
     private uiCamera!: Phaser.Cameras.Scene2D.Camera;
     private bgImage!: Phaser.GameObjects.TileSprite;
     private fogOverlay!: Phaser.GameObjects.Image;
+    private worldWidth = 0;
+    private worldHeight = 0;
 
     constructor() {
         super('GameScene');
@@ -128,8 +128,12 @@ export class GameScene extends Phaser.Scene {
         this.basketRowY = height - 25;
         this.trashRowY  = height - 70;
 
+        // World must fit all 3 zoom-out stages (each stage expands by 1.5×)
+        this.worldWidth  = Math.round(width  * Math.pow(1.5, 3));
+        this.worldHeight = Math.round(height * Math.pow(1.5, 3));
+
         // Background — tiled across the full world
-        this.bgImage = this.add.tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH, WORLD_HEIGHT, 'background');
+        this.bgImage = this.add.tileSprite(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 'background');
 
 
         // Extend physics world to match the current zone
@@ -137,7 +141,7 @@ export class GameScene extends Phaser.Scene {
         this.physics.world.setBounds(zone0.x, zone0.y, zone0.w, zone0.h);
 
         // Player
-        this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+        this.player = new Player(this, this.worldWidth / 2, this.worldHeight / 2);
         this.player.speed += this.registry.get('speedBonus') ?? 0;
         this.player.collectionRadius += this.registry.get('radiusBonus') ?? 0;
 
@@ -207,15 +211,15 @@ export class GameScene extends Phaser.Scene {
         }
 
         // Hut (shop entrance) — near player start, same relative offset as before
-        this.hut = this.add.image(WORLD_WIDTH / 2 + 180, WORLD_HEIGHT / 2 - 120, 'hut').setDepth(5);
+        this.hut = this.add.image(this.worldWidth / 2 + 180, this.worldHeight / 2 - 120, 'hut').setDepth(5);
         this.hut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
         // Costume shop — on the other side of the player start
-        this.costumeHut = this.add.image(WORLD_WIDTH / 2 - 180, WORLD_HEIGHT / 2 - 120, 'costume_hut').setDepth(5);
+        this.costumeHut = this.add.image(this.worldWidth / 2 - 180, this.worldHeight / 2 - 120, 'costume_hut').setDepth(5);
         this.costumeHut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
         // Depot (resource market) — below player start
-        this.depotHut = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2 + 160, 'skup_hut').setDepth(5);
+        this.depotHut = this.add.image(this.worldWidth / 2, this.worldHeight / 2 + 160, 'skup_hut').setDepth(5);
         this.depotHut.postFX.addShadow(1, 2, 0.99, 1, 0x000000, 4, 0.012);
 
 
@@ -296,7 +300,7 @@ export class GameScene extends Phaser.Scene {
         // Camera setup: static camera centered on world center, UI camera fixed
         this.cameras.main.setZoom(CAMERA_INITIAL_ZOOM);
         this.cameras.main.setBounds(zone0.x, zone0.y, zone0.w, zone0.h);
-        this.cameras.main.centerOn(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+        this.cameras.main.centerOn(this.worldWidth / 2, this.worldHeight / 2);
         this.cameras.main.setBackgroundColor('#6abf5e');
         this.uiCamera = this.cameras.add(0, 0, width, height);
 
@@ -380,8 +384,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     private getZoneBounds(stage: number): { x: number; y: number; w: number; h: number } {
-        const cx = WORLD_WIDTH / 2;
-        const cy = WORLD_HEIGHT / 2;
+        const cx = this.worldWidth / 2;
+        const cy = this.worldHeight / 2;
         const w = Math.round(this.scale.width * Math.pow(1.5, stage));
         const h = Math.round(this.scale.height * Math.pow(1.5, stage));
         return { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h };
