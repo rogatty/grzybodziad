@@ -31,6 +31,7 @@ export class Shop extends ModalScene {
     }
 
     create(): void {
+        this.fitToScreen();
         const { width, height } = this.scale;
 
         // Semi-transparent overlay

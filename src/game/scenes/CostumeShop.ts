@@ -29,6 +29,7 @@ export class CostumeShop extends ModalScene {
     }
 
     create(): void {
+        this.fitToScreen();
         const { width, height } = this.scale;
         const cx = Math.round(width / 2) - 150; // shifted left to make room for preview
 

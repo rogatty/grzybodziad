@@ -57,6 +57,7 @@ export class Depot extends ModalScene {
     }
 
     create(): void {
+        this.fitToScreen();
         const { width, height } = this.scale;
         const cx = Math.round(width / 2) - 150; // dialog center, shifted left to make room for grzybodziad
 

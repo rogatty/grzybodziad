@@ -35,6 +35,7 @@ export class TrashBin extends ModalScene {
     }
 
     create(): void {
+        this.fitToScreen();
         const { width, height } = this.scale;
         const cx = width / 2;
 
