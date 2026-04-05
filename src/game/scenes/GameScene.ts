@@ -496,6 +496,14 @@ export class GameScene extends Phaser.Scene {
 
         // Resize UI camera to match new viewport
         this.uiCamera.setViewport(0, 0, width, height);
+
+        // Update physics + camera bounds for the current zoom stage
+        const zone = this.getZoneBounds(this.zoomStage);
+        this.physics.world.setBounds(zone.x, zone.y, zone.w, zone.h);
+        this.cameras.main.setBounds(zone.x, zone.y, zone.w, zone.h);
+
+        // Fix input hitbox misalignment that occurs after canvas resize
+        this.scale.refresh();
     }
 
     private getZoneBounds(stage: number): { x: number; y: number; w: number; h: number } {

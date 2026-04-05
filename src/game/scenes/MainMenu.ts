@@ -50,6 +50,9 @@ export class MainMenu extends Phaser.Scene {
 
         this.input.keyboard!.on('keydown-SPACE', startGame);
 
+        // Re-create scene if canvas resizes (e.g. fullscreen activates before GRAJ is pressed)
+        this.scale.once('resize', () => this.scene.restart());
+
         // Bounce animation on title
         this.tweens.add({
             targets: this.children.list[1],
